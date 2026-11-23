@@ -7,7 +7,7 @@ import { s, colors, icon } from '../lib/styles';
 import { Trip } from '../types/models';
 
 // Native builds have no page origin; set EXPO_PUBLIC_SITE_URL to the production web address.
-const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL ?? 'https://nate69-golf-app.expo.app';
+const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL ?? 'https://golf-tournament-scoring-jet.vercel.app';
 
 export function joinLink(code: string): string {
   const origin = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : SITE_URL;
