@@ -4,6 +4,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { s, colors, icon } from '../lib/styles';
 import { PressableLink } from './NavCard';
 import { Trip, MatchFormat } from '../types/models';
+import { FORMAT_LABEL, sideSize } from '../lib/scoring';
+
+const ALLOWANCES = [100, 90, 85, 80, 75];
+const FORMAT_HELP: Record<MatchFormat, string> = {
+  singles: 'One player against one. Full course handicaps.',
+  fourball: 'Pairs, everyone plays their own ball; the better net score counts each hole.',
+  foursomes: 'Pairs share one ball and take turns hitting. Side handicap: 50% of the pair’s combined course handicaps.',
+  scramble: 'Pairs both hit, pick the best shot, and play from there. Side handicap: 35% of the lower + 15% of the higher.',
+};
 
 export type Slots = { sideA: (string | null)[]; sideB: (string | null)[] };
 
@@ -15,6 +24,8 @@ export function MatchBuilder({
   playerIds,
   format,
   onFormat,
+  allowance,
+  onAllowance,
   matches,
   onChange,
 }: {
@@ -22,11 +33,13 @@ export function MatchBuilder({
   playerIds: string[];
   format: MatchFormat;
   onFormat: (f: MatchFormat) => void;
+  allowance: number; // four-ball %
+  onAllowance: (pct: number) => void;
   matches: Slots[];
   onChange: (m: Slots[]) => void;
 }) {
   const [teamA, teamB] = trip.teams;
-  const size = format === 'fourball' ? 2 : 1;
+  const size = sideSize(format);
   const roster = (teamId: string) => trip.players.filter((p) => p.teamId === teamId && playerIds.includes(p.id));
   const used = new Set(matches.flatMap((m) => [...m.sideA, ...m.sideB]).filter(Boolean));
 
@@ -124,23 +137,46 @@ export function MatchBuilder({
     <View style={{ gap: 12 }}>
       <Text style={s.label}>Format</Text>
       <View style={s.pillRow}>
-        {(['singles', 'fourball'] as const).map((f) => (
+        {(['singles', 'fourball', 'foursomes', 'scramble'] as const).map((f) => (
           <Pressable
             key={f}
             onPress={() => {
               setPicking(null);
               onFormat(f);
             }}
-            accessibilityRole="button"
-            accessibilityState={{ selected: format === f }}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: format === f }}
             style={[s.pill, format === f && s.pillActive]}
           >
             <Text style={format === f ? s.pillTextActive : s.pillText}>
-              {f === 'singles' ? 'Singles (1 v 1)' : 'Four Ball (2 v 2, 90% HCP)'}
+              {FORMAT_LABEL[f]} ({sideSize(f)} v {sideSize(f)})
             </Text>
           </Pressable>
         ))}
       </View>
+      <Text style={s.subtitle}>{FORMAT_HELP[format]}</Text>
+      {format === 'fourball' && (
+        <View style={{ gap: 6 }}>
+          <Text style={s.label}>Handicap allowance</Text>
+          <View style={s.pillRow}>
+            {ALLOWANCES.map((pct) => (
+              <Pressable
+                key={pct}
+                onPress={() => onAllowance(pct)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: allowance === pct }}
+                accessibilityLabel={`${pct}% of course handicap${pct === 90 ? ', recommended' : ''}`}
+                style={[s.pill, allowance === pct && s.pillActive]}
+              >
+                <Text style={allowance === pct ? s.pillTextActive : s.pillText}>
+                  {pct}%{pct === 90 ? ' ★' : ''}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={s.subtitle}>Each player gets this share of their course handicap. ★ = WHS recommended.</Text>
+        </View>
+      )}
 
       {matches.length === 0 ? (
         <View style={[s.card, { gap: 6 }]}>
@@ -165,7 +201,7 @@ export function MatchBuilder({
             <Text style={[st.teamHead, { color: colors.teamAText }]} numberOfLines={1}>
               {teamA.name.toUpperCase()}
             </Text>
-            <Text style={st.boardTitle}>{format === 'fourball' ? 'FOUR BALL' : 'SINGLES'}</Text>
+            <Text style={st.boardTitle}>{FORMAT_LABEL[format].toUpperCase()}</Text>
             <Text style={[st.teamHead, { color: colors.teamBText, textAlign: 'right' }]} numberOfLines={1}>
               {teamB.name.toUpperCase()}
             </Text>

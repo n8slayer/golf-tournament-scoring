@@ -10,6 +10,7 @@ import {
   teamPoints,
   courseFor,
   formatOf,
+  FORMAT_LABEL,
   allowanceFor,
   MatchPairing,
 } from '../lib/scoring';
@@ -22,16 +23,13 @@ export const fmtPts = (n: number) => {
   return half ? `${whole || ''}½` : String(whole);
 };
 
-const FORMAT_LABEL = { singles: 'Singles', fourball: 'Four Ball' } as const;
-
 export function MatchCard({ trip, round, pairing, href }: { trip: Trip; round: Round; pairing: MatchPairing; href?: Href }) {
   const total = holeNumbersFor(round.holesPlayed).length;
   const st = matchStatus(trip, round, pairing);
   const pts = matchPoints(st, total);
   const nameOf = (id: string) => trip.players.find((p) => p.id === id)?.name ?? '?';
   const leaderColor = st.holesUp > 0 ? colors.teamA : st.holesUp < 0 ? colors.teamB : null;
-  const big =
-    st.through === 0 ? '–' : st.holesUp === 0 ? 'AS' : st.closedOut ? st.resultLabel : `${Math.abs(st.holesUp)} UP`;
+  const big = st.through === 0 ? '–' : st.holesUp === 0 ? 'AS' : st.closedOut ? st.resultLabel : `${Math.abs(st.holesUp)} UP`;
   const small = st.through === 0 ? 'Not started' : pts ? 'Final' : `thru ${st.through}`;
   const sideText = (ids: string[]) => ids.map(nameOf).join(' & ');
   const a11y = `${sideText(pairing.sideA)} versus ${sideText(pairing.sideB)}. ${
@@ -59,9 +57,7 @@ export function MatchCard({ trip, round, pairing, href }: { trip: Trip; round: R
           </View>
           <Text style={st_.statusSmall}>{small}</Text>
         </View>
-        <View
-          style={[st_.side, { alignItems: 'flex-end', borderRightColor: colors.teamB, borderRightWidth: 4, paddingRight: 8 }]}
-        >
+        <View style={[st_.side, { alignItems: 'flex-end', borderRightColor: colors.teamB, borderRightWidth: 4, paddingRight: 8 }]}>
           {pairing.sideB.map((id) => (
             <Text key={id} style={[st_.name, { color: colors.teamBText, textAlign: 'right' }]} numberOfLines={1}>
               {nameOf(id)}

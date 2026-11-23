@@ -17,6 +17,7 @@ import {
   computeSettlement,
   courseFor,
   formatOf,
+  FORMAT_LABEL,
   allowanceFor,
   matchPairings,
 } from '../../../../lib/scoring';
@@ -100,7 +101,7 @@ function RoundCard({ trip, round }: { trip: Trip; round: Round }) {
           {state === 'live' && <Chip text="LIVE" tone="green" />}
         </View>
         <View style={[s.row, { justifyContent: 'flex-start', flexWrap: 'wrap', gap: 6 }]}>
-          {round.matchEnabled && <Chip text={formatOf(round) === 'fourball' ? 'FOUR BALL' : 'SINGLES'} />}
+          {round.matchEnabled && <Chip text={FORMAT_LABEL[formatOf(round)].toUpperCase()} />}
           <Text style={[s.subtitle, { fontSize: 14, color: colors.text }]} numberOfLines={1}>
             {course.name}
           </Text>

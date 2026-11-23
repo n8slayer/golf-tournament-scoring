@@ -29,9 +29,35 @@ function netStrokes(course: Course, player: Player, holeNumber: number, strokes:
 
 export const formatOf = (round: Round): MatchFormat => round.format ?? 'singles';
 
-// WHS recommended match-play allowances: singles 100%, four-ball 90%.
+export const FORMAT_LABEL: Record<MatchFormat, string> = {
+  singles: 'Singles',
+  fourball: 'Four Ball',
+  foursomes: 'Alternate Shot',
+  scramble: 'Scramble',
+};
+
+// One ball per side (alternate shot, scramble): the side's score is entered once, for every player on it.
+export const isTeamBall = (format: MatchFormat) => format === 'foursomes' || format === 'scramble';
+export const sideSize = (format: MatchFormat) => (format === 'singles' ? 1 : 2);
+
+// Per-player allowance: singles 100%; four-ball as set for the round (WHS recommends 90%).
+// Team-ball formats use a side handicap instead (sideHandicap).
 export function allowanceFor(round: Round): number {
-  return formatOf(round) === 'fourball' ? 0.9 : 1;
+  return formatOf(round) === 'fourball' ? (round.allowance ?? 90) / 100 : 1;
+}
+
+// WHS recommended side handicaps: alternate shot 50% of the combined course handicaps;
+// scramble 35% low + 15% high (2 players), 25/20/15/10% from low to high (4 players).
+export function sideHandicap(trip: Trip, round: Round, ids: string[]): number {
+  const course = courseFor(trip, round);
+  const chs = ids
+    .map((id) => getPlayer(trip, id))
+    .filter((p): p is Player => !!p)
+    .map((p) => courseHandicap(p.handicapIndex, course))
+    .sort((a, b) => a - b);
+  if (formatOf(round) === 'foursomes') return Math.round(0.5 * chs.reduce((a, b) => a + b, 0));
+  const weights = chs.length >= 3 ? [0.25, 0.2, 0.15, 0.1] : chs.length === 2 ? [0.35, 0.15] : [1];
+  return Math.round(chs.reduce((sum, ch, i) => sum + ch * (weights[i] ?? 0), 0));
 }
 
 // Older trips have no event settings: teams mean Ryder Cup, otherwise stroke play.
@@ -85,9 +111,7 @@ export function leaderboard(trip: Trip, round: Round): LeaderboardRow[] {
     return { playerId, playerName: player?.name ?? 'Unknown', thru, gross, net, netToPar: net - par, points };
   });
   const stableford = eventOf(trip).type === 'stableford';
-  return rows.sort((a, b) =>
-    a.thru === 0 && b.thru === 0 ? 0 : stableford ? b.points - a.points : a.net - b.net
-  );
+  return rows.sort((a, b) => (a.thru === 0 && b.thru === 0 ? 0 : stableford ? b.points - a.points : a.net - b.net));
 }
 
 // ---------- Match play (singles or four-ball; sideA = team A, sideB = team B) ----------
@@ -104,7 +128,7 @@ export function defaultPairings(trip: Trip, playerIds: string[], format: MatchFo
   const rosterFor = (teamId: string) => trip.players.filter((p) => p.teamId === teamId && playerIds.includes(p.id));
   const a = rosterFor(teamA.id).map((p) => p.id);
   const b = rosterFor(teamB.id).map((p) => p.id);
-  const size = format === 'fourball' ? 2 : 1;
+  const size = sideSize(format);
   const count = Math.floor(Math.min(a.length, b.length) / size);
   return Array.from({ length: count }, (_, i) => ({
     sideA: a.slice(i * size, i * size + size),
@@ -131,7 +155,15 @@ function sideNetFn(trip: Trip, round: Round) {
   const scores = roundScoresFor(trip, round.id);
   const course = courseFor(trip, round);
   const allowance = allowanceFor(round);
+  const teamBall = isTeamBall(formatOf(round));
   return (ids: string[], holeNumber: number): number | null => {
+    if (teamBall) {
+      // One ball: the side's score sits on its first player.
+      const sc = getScore(scores, ids[0], holeNumber);
+      const hole = getHole(course, holeNumber);
+      if (!sc || !hole) return null;
+      return sc.strokes - strokesReceivedOnHole(sideHandicap(trip, round, ids), hole.strokeIndex);
+    }
     let best: number | null = null;
     for (const id of ids) {
       const player = getPlayer(trip, id);
@@ -149,6 +181,12 @@ export function matchStrokesOnHole(trip: Trip, round: Round, playerId: string, h
   const player = getPlayer(trip, playerId);
   const hole = getHole(courseFor(trip, round), holeNumber);
   if (!player || !hole) return 0;
+  if (isTeamBall(formatOf(round))) {
+    const side = matchPairings(trip, round)
+      .flatMap((m) => [m.sideA, m.sideB])
+      .find((ids) => ids.includes(playerId));
+    return strokesReceivedOnHole(sideHandicap(trip, round, side ?? [playerId]), hole.strokeIndex);
+  }
   const handicap = Math.round(courseHandicap(player.handicapIndex, courseFor(trip, round)) * allowanceFor(round));
   return strokesReceivedOnHole(handicap, hole.strokeIndex);
 }
@@ -332,7 +370,7 @@ export interface StandingRow {
 
 export function tripStandings(trip: Trip): StandingRow[] {
   const rows = new Map<string, StandingRow>(
-    trip.players.map((p) => [p.id, { playerId: p.id, playerName: p.name, rounds: 0, holes: 0, gross: 0, netToPar: 0, points: 0 }])
+    trip.players.map((p) => [p.id, { playerId: p.id, playerName: p.name, rounds: 0, holes: 0, gross: 0, netToPar: 0, points: 0 }]),
   );
   for (const round of trip.rounds) {
     for (const r of leaderboard(trip, round)) {
@@ -404,11 +442,13 @@ function selfCheck() {
       { id: 'A', name: 'Team A' },
       { id: 'B', name: 'Team B' },
     ],
-    courses: [{
-      id: 'c1',
-      name: 'Test Course',
-      holes: Array.from({ length: 18 }, (_, i) => ({ number: i + 1, par: 4, strokeIndex: i + 1 })),
-    }],
+    courses: [
+      {
+        id: 'c1',
+        name: 'Test Course',
+        holes: Array.from({ length: 18 }, (_, i) => ({ number: i + 1, par: 4, strokeIndex: i + 1 })),
+      },
+    ],
     rounds: [
       {
         id: 'r1',
@@ -451,8 +491,41 @@ function selfCheck() {
   const fbStatus = matchStatus(trip, fb, fb.matches![0]);
   console.assert(fbStatus.holesUp === 1 && fbStatus.through === 1, 'fourball: best ball 3 beats 4');
   console.assert(allowanceFor(fb) === 0.9 && allowanceFor(trip.rounds[0]) === 1, 'fourball: 90% allowance, singles 100%');
+  console.assert(allowanceFor({ ...fb, allowance: 85 }) === 0.85, 'fourball: allowance can be set per round');
+
+  // Team ball: side handicaps (no slope on the test course, so course handicap = index).
+  const hc: Trip = { ...trip, players: trip.players.map((p, i) => ({ ...p, handicapIndex: [10, 20, 6, 30][i] })) };
+  const fs: Round = { ...fb, format: 'foursomes' };
+  const sc: Round = { ...fb, format: 'scramble' };
+  console.assert(
+    sideHandicap(hc, fs, ['p1', 'p3']) === 8 && sideHandicap(hc, fs, ['p2', 'p4']) === 25,
+    'foursomes: 50% of combined (16 -> 8, 50 -> 25)',
+  );
+  console.assert(
+    sideHandicap(hc, sc, ['p1', 'p3']) === 4 && sideHandicap(hc, sc, ['p2', 'p4']) === 12,
+    'scramble: 35% low + 15% high (6,10 -> 4; 20,30 -> 12)',
+  );
+  // Hole 1 (SI 1): A's ball 4 gets 1 -> net 3; B's ball 4 gets 2 (25 strokes) -> net 2: B wins.
+  const tb = {
+    ...hc,
+    scores: [
+      { roundId: 'r1', playerId: 'p1', holeNumber: 1, strokes: 4 },
+      { roundId: 'r1', playerId: 'p3', holeNumber: 1, strokes: 4 },
+      { roundId: 'r1', playerId: 'p2', holeNumber: 1, strokes: 4 },
+      { roundId: 'r1', playerId: 'p4', holeNumber: 1, strokes: 4 },
+    ],
+  };
+  const fsStatus = matchStatus(tb, fs, fs.matches![0]);
+  console.assert(fsStatus.holesUp === -1 && fsStatus.through === 1, 'foursomes: one ball per side, side handicap applied');
+  console.assert(
+    matchStrokesOnHole(tb, fs, 'p4', 1) === 2 && matchStrokesOnHole(tb, fs, 'p3', 1) === 1,
+    "foursomes: strokes are the side's",
+  );
   const dp = defaultPairings(trip, ['p1', 'p2', 'p3', 'p4'], 'fourball');
-  console.assert(dp.length === 1 && dp[0].sideA.join() === 'p1,p3' && dp[0].sideB.join() === 'p2,p4', 'fourball: default pairs by draft order');
+  console.assert(
+    dp.length === 1 && dp[0].sideA.join() === 'p1,p3' && dp[0].sideB.join() === 'p2,p4',
+    'fourball: default pairs by draft order',
+  );
 
   // Points: win 1, halve half each, in progress none.
   const done = (holesUp: number): MatchStatus => ({ pairing: dp[0], through: 9, holesUp, closedOut: false, resultLabel: '' });
@@ -465,16 +538,21 @@ function selfCheck() {
   // Four-ball settlement over 18 holes: team A wins hole 1 then all halved -> each loser pays $20.
   const fb18: Round = { ...fb, holesPlayed: '18', skinsEnabled: false };
   const extra = [];
-  for (let h = 2; h <= 18; h++) for (const p of ['p1', 'p2', 'p3', 'p4']) extra.push({ roundId: 'r1', playerId: p, holeNumber: h, strokes: 4 });
+  for (let h = 2; h <= 18; h++)
+    for (const p of ['p1', 'p2', 'p3', 'p4']) extra.push({ roundId: 'r1', playerId: p, holeNumber: h, strokes: 4 });
   const fbLines = computeSettlement({ ...trip, rounds: [fb18], scores: [...trip.scores, ...extra] });
   console.assert(fbLines.length === 2 && fbLines.every((l) => l.amount === 20), 'fourball settlement: both losers pay $20');
   const lastHole = matchStatus({ ...trip, scores: [...trip.scores, ...extra] }, fb18, fb18.matches![0]);
-  console.assert(lastHole.resultLabel === '1 up' && !lastHole.closedOut && lastHole.through === 18, 'match: won on 18 reads "1 up", not "1&0"');
+  console.assert(
+    lastHole.resultLabel === '1 up' && !lastHole.closedOut && lastHole.through === 18,
+    'match: won on 18 reads "1 up", not "1&0"',
+  );
 
   // Stableford: net birdie 3, par 2, bogey 1, double 0 (never negative).
   console.assert(
-    [stablefordPoints(3, 4), stablefordPoints(4, 4), stablefordPoints(5, 4), stablefordPoints(6, 4), stablefordPoints(9, 4)].join() === '3,2,1,0,0',
-    'stableford: points per hole'
+    [stablefordPoints(3, 4), stablefordPoints(4, 4), stablefordPoints(5, 4), stablefordPoints(6, 4), stablefordPoints(9, 4)].join() ===
+      '3,2,1,0,0',
+    'stableford: points per hole',
   );
   // Standings across two rounds: second round copies the first with Alice making 5s.
   const r2: Round = { ...trip.rounds[0], id: 'r2' };
@@ -492,7 +570,10 @@ function selfCheck() {
 
   // Match scorecard agrees with the match status: four-ball hole 1 → A 1 up, rest unplayed.
   const mh = matchHoles(trip, fb, fb.matches![0]);
-  console.assert(mh[0].upAfter === 1 && mh[0].netA === 3 && mh[0].netB === 4 && mh[1].upAfter === null, 'match holes: hole 1 A up, hole 2 not played');
+  console.assert(
+    mh[0].upAfter === 1 && mh[0].netA === 3 && mh[0].netB === 4 && mh[1].upAfter === null,
+    'match holes: hole 1 A up, hole 2 not played',
+  );
   console.assert(matchStrokesOnHole(trip, fb, 'p1', 1) === 0, 'match holes: scratch gets no strokes');
 
   const settlement = computeSettlement(trip);

@@ -34,7 +34,8 @@ export type NewCourse = Omit<Course, 'id'>;
 
 export type HolesPlayed = 'front9' | 'back9' | '18';
 
-export type MatchFormat = 'singles' | 'fourball';
+// foursomes = alternate shot; foursomes and scramble play one ball per side.
+export type MatchFormat = 'singles' | 'fourball' | 'foursomes' | 'scramble';
 
 // sideA = team A players, sideB = team B players (1 each for singles, 2 for four-ball).
 export interface Match {
@@ -50,6 +51,7 @@ export interface Round {
   courseId: string;
   holesPlayed: HolesPlayed;
   format?: MatchFormat; // missing = singles (rounds made before formats existed)
+  allowance?: number; // four-ball handicap %, missing = 90
   matches?: Match[]; // missing = automatic draft-order singles
   skinsEnabled: boolean;
   skinValue: number;

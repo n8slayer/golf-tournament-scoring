@@ -2,7 +2,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { ScoreMark } from './Scorecard';
 import { colors } from '../lib/styles';
 import { Trip, Round, Hole } from '../types/models';
-import { MatchPairing, matchHoles, matchStrokesOnHole, courseFor, formatOf } from '../lib/scoring';
+import { MatchPairing, matchHoles, matchStrokesOnHole, courseFor, formatOf, isTeamBall, allowanceFor } from '../lib/scoring';
 import { holeNumbersFor } from '../lib/holeRanges';
 
 // Match play card: each player's gross (with stroke dots), each side's best net,
@@ -15,6 +15,10 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
     trip.scores.find((sc) => sc.roundId === round.id && sc.playerId === pid && sc.holeNumber === n)?.strokes;
   const nameOf = (id: string) => trip.players.find((p) => p.id === id)?.name ?? '?';
   const fourball = formatOf(round) === 'fourball';
+  // Alternate shot / scramble: one ball per side, shown as one row named after both players.
+  const teamBall = isTeamBall(formatOf(round));
+  const sideOf = (pid: string) => (pairing.sideA.includes(pid) ? pairing.sideA : pairing.sideB);
+  const rowsOf = (ids: string[]) => (teamBall ? ids.slice(0, 1) : ids);
 
   const nine = (hs: Hole[], label: string) => {
     if (!hs.length) return null;
@@ -25,7 +29,7 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
     const playerRow = (pid: string, color: string) => (
       <View key={pid} style={st.row}>
         <Text style={[st.label, { color, fontWeight: '800' }]} numberOfLines={1}>
-          {nameOf(pid)}
+          {teamBall ? sideOf(pid).map(nameOf).join(' & ') : nameOf(pid)}
         </Text>
         {hs.map((h) => {
           const pops = matchStrokesOnHole(trip, round, pid, h.number);
@@ -97,7 +101,7 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
           ))}
           <Text style={st.total} />
         </View>
-        {pairing.sideA.map((pid) => playerRow(pid, colors.teamAText))}
+        {rowsOf(pairing.sideA).map((pid) => playerRow(pid, colors.teamAText))}
         {netRow('A')}
         <View style={[st.row, st.matchRow]}>
           <Text style={[st.label, { fontWeight: '800' }]}>Match</Text>
@@ -117,18 +121,25 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
           <Text style={st.total} />
         </View>
         {netRow('B')}
-        {pairing.sideB.map((pid) => playerRow(pid, colors.teamBText))}
+        {rowsOf(pairing.sideB).map((pid) => playerRow(pid, colors.teamBText))}
       </View>
     );
   };
 
   return (
     <View style={{ gap: 10 }}>
-      {nine(holes.filter((h) => h.number <= 9), 'Out')}
-      {nine(holes.filter((h) => h.number > 9), 'In')}
+      {nine(
+        holes.filter((h) => h.number <= 9),
+        'Out',
+      )}
+      {nine(
+        holes.filter((h) => h.number > 9),
+        'In',
+      )}
       <Text style={st.legend}>
-        Dots = strokes received in this match{fourball ? ' (90% of course handicap)' : ''}. Highlighted net = hole won. Match row = holes up
-        after each hole, in the leading team's colour.
+        Dots = strokes received in this match
+        {fourball ? ` (${Math.round(allowanceFor(round) * 100)}% of course handicap)` : teamBall ? ' (side handicap)' : ''}. Highlighted net
+        = hole won. Match row = holes up after each hole, in the leading team's colour.
       </Text>
     </View>
   );

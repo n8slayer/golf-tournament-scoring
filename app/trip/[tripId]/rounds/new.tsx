@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, Switch, ScrollView } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTrips } from '../../../../context/TripsContext';
 import { HolesPlayed, MatchFormat } from '../../../../types/models';
-import { defaultPairings, eventOf } from '../../../../lib/scoring';
+import { defaultPairings, eventOf, isTeamBall } from '../../../../lib/scoring';
 import { MatchBuilder, Slots, isComplete } from '../../../../components/MatchBuilder';
 import { PressableLink } from '../../../../components/NavCard';
 import { s } from '../../../../lib/styles';
@@ -35,6 +35,7 @@ export default function NewRound() {
   const [matchEnabled, setMatchEnabled] = useState(event ? event.type === 'rydercup' : true);
   const [matchStake, setMatchStake] = useState(String(event?.matchStake ?? 20));
   const [format, setFormat] = useState<MatchFormat>('singles');
+  const [allowance, setAllowance] = useState(90); // four-ball %
   const [slots, setSlots] = useState<Slots[] | null>(null); // null = draft-order defaults
 
   if (!trip) return null;
@@ -68,6 +69,8 @@ export default function NewRound() {
   // No matches (e.g. players not on teams yet) is fine: the round is stroke play + skins.
   const matchesOk = !matchEnabled || !hasTeams || matches.length === 0 || isComplete(matches);
   const withMatches = matchEnabled && hasTeams && matches.length > 0;
+  // One ball per side: no individual scores, so no skins.
+  const teamBall = withMatches && isTeamBall(format);
   const canCreate = selected.length > 0 && !!name.trim() && matchesOk;
 
   const submit = () => {
@@ -77,7 +80,7 @@ export default function NewRound() {
       courseId: chosenCourseId,
       date: new Date().toISOString(),
       holesPlayed,
-      skinsEnabled,
+      skinsEnabled: skinsEnabled && !teamBall,
       skinValue: parseFloat(skinValue) || 0,
       matchEnabled: withMatches,
       matchStake: parseFloat(matchStake) || 0,
@@ -85,6 +88,7 @@ export default function NewRound() {
       ...(withMatches
         ? {
             format,
+            ...(format === 'fourball' ? { allowance } : {}),
             matches: matches.map((m, i) => ({
               id: `m${i + 1}`,
               sideA: m.sideA as string[],
@@ -139,9 +143,13 @@ export default function NewRound() {
 
       <View style={[s.row, { marginTop: 8 }]}>
         <Text style={s.label}>Skins</Text>
-        <Switch value={skinsEnabled} onValueChange={setSkinsEnabled} />
+        {teamBall ? (
+          <Text style={[s.subtitle, { flex: 1, textAlign: 'right' }]}>Off: one ball per side</Text>
+        ) : (
+          <Switch value={skinsEnabled} onValueChange={setSkinsEnabled} />
+        )}
       </View>
-      {skinsEnabled && (
+      {skinsEnabled && !teamBall && (
         <View>
           <Text style={s.label}>$ per skin</Text>
           <TextInput style={s.input} value={skinValue} onChangeText={setSkinValue} keyboardType="decimal-pad" />
@@ -167,6 +175,8 @@ export default function NewRound() {
                 setFormat(f);
                 setSlots(null);
               }}
+              allowance={allowance}
+              onAllowance={setAllowance}
               matches={matches}
               onChange={setSlots}
             />

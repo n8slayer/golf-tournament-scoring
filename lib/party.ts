@@ -1,5 +1,5 @@
 import { Trip } from '../types/models';
-import { courseFor } from './scoring';
+import { courseFor, formatOf, isTeamBall, matchPairings } from './scoring';
 
 // Party Mode: every gross birdie or better in the event (strokes <= par - 1).
 export interface PartyHole {
@@ -16,15 +16,24 @@ const LABEL: Record<number, string> = { 1: 'BIRDIE', 2: 'EAGLE', 3: 'ALBATROSS' 
 
 export function partyHoles(trip: Trip): PartyHole[] {
   const out: PartyHole[] = [];
+  const nameOf = (id: string) => trip.players.find((p) => p.id === id)?.name ?? 'Someone';
   for (const sc of trip.scores) {
     const round = trip.rounds.find((r) => r.id === sc.roundId);
+    // Alternate shot / scramble: the side's score is on every player; celebrate it once, from its first player.
+    const side =
+      round && round.matchEnabled && isTeamBall(formatOf(round))
+        ? matchPairings(trip, round)
+            .flatMap((m) => [m.sideA, m.sideB])
+            .find((ids) => ids.includes(sc.playerId))
+        : undefined;
+    if (side && side[0] !== sc.playerId) continue;
     const par = round && courseFor(trip, round)?.holes.find((h) => h.number === sc.holeNumber)?.par;
     if (!round || !par || !sc.strokes || sc.strokes > par - 1) continue;
     out.push({
       key: `${sc.roundId}:${sc.playerId}:${sc.holeNumber}`,
       roundId: sc.roundId,
       playerId: sc.playerId,
-      playerName: trip.players.find((p) => p.id === sc.playerId)?.name ?? 'Someone',
+      playerName: side ? side.map(nameOf).join(' & ') : nameOf(sc.playerId),
       roundName: round.name,
       hole: sc.holeNumber,
       label: sc.strokes === 1 ? 'HOLE IN ONE' : (LABEL[par - sc.strokes] ?? 'ALBATROSS'),
@@ -59,5 +68,25 @@ function selfCheck() {
     ],
   } as Trip;
   console.assert(partyHoles(par).length === 0, 'party: ignores par and bogey');
+  const team = {
+    ...trip,
+    players: [...trip.players, { id: 'b', name: 'Ann', handicapIndex: 0 }],
+    rounds: [
+      {
+        id: 'r',
+        name: 'Day 1',
+        courseId: 'c',
+        matchEnabled: true,
+        format: 'scramble',
+        matches: [{ id: 'm', sideA: ['a', 'b'], sideB: [] }],
+      },
+    ],
+    scores: [
+      { roundId: 'r', playerId: 'a', holeNumber: 1, strokes: 3 },
+      { roundId: 'r', playerId: 'b', holeNumber: 1, strokes: 3 },
+    ],
+  } as unknown as Trip;
+  const tp = partyHoles(team);
+  console.assert(tp.length === 1 && tp[0].playerName === 'Mike & Ann', 'party: one celebration per side in scramble');
 }
 selfCheck();

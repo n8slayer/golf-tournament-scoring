@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../context/TripsContext';
 import { holeNumbersFor } from '../lib/holeRanges';
 import { strokesReceivedOnHole, courseHandicap, formatHandicap } from '../lib/handicap';
-import { leaderboard, matchPairings, matchStatus, courseFor, eventOf } from '../lib/scoring';
+import { leaderboard, matchPairings, matchStatus, courseFor, eventOf, formatOf, isTeamBall, sideHandicap } from '../lib/scoring';
 import { router } from 'expo-router';
 import { s, colors, icon } from '../lib/styles';
 import { Trip, Round } from '../types/models';
@@ -61,6 +61,22 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   // Your own player first (if you've said which one you are).
   const mine = trip.sync?.myPlayerId;
   const players = trip.players.filter((p) => round.playerIds.includes(p.id)).sort((a, b) => (a.id === mine ? -1 : b.id === mine ? 1 : 0));
+  // Who gets a score row: each player, or each side in alternate shot / scramble (one ball per side;
+  // its score is saved for every player on the side). Your own row first.
+  const sides = round.matchEnabled && isTeamBall(formatOf(round)) ? matchPairings(trip, round).flatMap((m) => [m.sideA, m.sideB]) : [];
+  const onASide = new Set(sides.flat());
+  const entries = [
+    ...sides.map((ids) => ({
+      id: ids[0],
+      ids,
+      name: ids.map((id) => trip.players.find((x) => x.id === id)?.name ?? '?').join(' & '),
+      ch: sideHandicap(trip, round, ids),
+      isMine: !!mine && ids.includes(mine),
+    })),
+    ...players
+      .filter((p) => !onASide.has(p.id))
+      .map((p) => ({ id: p.id, ids: [p.id], name: p.name, ch: courseHandicap(p.handicapIndex, course), isMine: p.id === mine })),
+  ].sort((a, b) => Number(b.isMine) - Number(a.isMine));
   const roundScores = trip.scores.filter((sc) => sc.roundId === roundId);
   const strokesFor = (playerId: string, n = holeNumber) =>
     roundScores.find((sc) => sc.playerId === playerId && sc.holeNumber === n)?.strokes;
@@ -76,11 +92,11 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
     setIndex((i) => i + 1);
   };
 
-  const step = (playerId: string, delta: number) => {
-    const current = strokesFor(playerId);
+  const step = (ids: string[], delta: number) => {
+    const current = strokesFor(ids[0]);
     // First tap on an empty score starts at par.
     const next = current === undefined ? hole.par : Math.max(1, current + delta);
-    recordScore(tripId, roundId, playerId, holeNumber, next);
+    for (const id of ids) recordScore(tripId, roundId, id, holeNumber, next);
   };
 
   // Who's up: match play status first (if on), then net standings.
@@ -97,7 +113,8 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
         return `${leader} ${won ? 'wins' : ''} ${st.resultLabel}`.replace(/\s+/g, ' ');
       })
     : [];
-  const standings = leaderboard(trip, round).filter((r) => r.thru > 0);
+  // Individual net standings mean nothing when each side plays one ball: show only the match status then.
+  const standings = sides.length ? [] : leaderboard(trip, round).filter((r) => r.thru > 0);
 
   const base = `/trip/${tripId}/rounds/${roundId}`;
 
@@ -124,7 +141,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
               ))}
             </View>
           ) : (
-            <Text style={hb.statusText}>No scores yet. Net standings appear after the first hole.</Text>
+            !sides.length && <Text style={hb.statusText}>No scores yet. Net standings appear after the first hole.</Text>
           )}
         </View>
 
@@ -188,9 +205,9 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
       </View>
 
       <ScrollView contentContainerStyle={s.content}>
-        {players.map((p) => {
+        {entries.map((p) => {
           const strokes = strokesFor(p.id);
-          const ch = courseHandicap(p.handicapIndex, course);
+          const ch = p.ch;
           const popsOn = (n: number) => strokesReceivedOnHole(ch, course.holes.find((h) => h.number === n)?.strokeIndex ?? 99);
           const pops = popsOn(holeNumber);
           const label = strokes !== undefined ? toParLabel(strokes - hole.par) : null;
@@ -201,7 +218,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
                   <View style={[s.row, { justifyContent: 'flex-start', gap: 6 }]}>
                     <Text style={s.title} numberOfLines={1}>
                       {p.name}
-                      {p.id === mine ? ' (you)' : ''}
+                      {p.isMine ? ' (you)' : ''}
                     </Text>
                     {/* Scorecard-style dots: one per stroke received on this hole */}
                     {Array.from({ length: Math.max(0, pops) }, (_, i) => (
@@ -220,7 +237,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
                 </View>
                 <View style={[s.row, { gap: 8 }]}>
                   <Pressable
-                    onPress={() => step(p.id, -1)}
+                    onPress={() => step(p.ids, -1)}
                     accessibilityRole="button"
                     accessibilityLabel={`One less stroke for ${p.name}`}
                     style={({ pressed }) => [hb.stepBtn, pressed && s.pressed]}
@@ -234,7 +251,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
                     {strokes ?? '–'}
                   </Text>
                   <Pressable
-                    onPress={() => step(p.id, 1)}
+                    onPress={() => step(p.ids, 1)}
                     accessibilityRole="button"
                     accessibilityLabel={`One more stroke for ${p.name}`}
                     style={({ pressed }) => [hb.stepBtn, hb.stepBtnPlus, pressed && s.pressed]}
