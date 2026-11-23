@@ -59,7 +59,6 @@ export default function RootLayout() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="events" options={{ title: 'Your events' }} />
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-          <Stack.Screen name="trip/new" options={{ title: 'New Event' }} />
           <Stack.Screen name="join/[code]" options={{ title: 'Join event' }} />
           <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
         </Stack>

@@ -7,6 +7,7 @@ import { useTrips } from '../../../../context/TripsContext';
 import { PressableLink } from '../../../../components/NavCard';
 import { TeamScoreHeader } from '../../../../components/MatchBoard';
 import { CourseHero } from '../../../../components/CourseHero';
+import { SetupChecklist } from '../../../../components/SetupChecklist';
 import { joinLink } from '../../../../components/ShareCard';
 import { playerSlots, PlayerSlot } from '../../../../lib/sync';
 import {
@@ -277,6 +278,7 @@ export default function EventHome() {
             : `Syncing ${pending} change${pending === 1 ? '' : 's'}…`}
         </Text>
       )}
+      {editor && <SetupChecklist trip={trip} />}
       {needsPlayer && trip.sync && (
         <PressableLink href={`/join/${trip.sync.inviteCode}`} style={s.buttonSecondary}>
           <Ionicons name="person" size={icon.sm} color={colors.accent} />

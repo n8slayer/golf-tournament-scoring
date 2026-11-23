@@ -10,7 +10,7 @@ export function HeaderLeft() {
   const canGoBack = useCanGoBack();
   const pathname = usePathname();
   const eventHome = pathname.match(/^\/trip\/[^/]+/)?.[0];
-  const home = eventHome && eventHome !== '/trip/new' && pathname !== eventHome ? eventHome : '/';
+  const home = eventHome && pathname !== eventHome ? eventHome : '/';
   return (
     <Pressable
       onPress={() => (canGoBack ? router.back() : router.replace(home as never))}

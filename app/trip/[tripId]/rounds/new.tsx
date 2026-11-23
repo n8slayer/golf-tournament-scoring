@@ -5,6 +5,7 @@ import { useTrips } from '../../../../context/TripsContext';
 import { HolesPlayed, MatchFormat } from '../../../../types/models';
 import { defaultPairings, eventOf } from '../../../../lib/scoring';
 import { MatchBuilder, Slots, isComplete } from '../../../../components/MatchBuilder';
+import { PressableLink } from '../../../../components/NavCard';
 import { s } from '../../../../lib/styles';
 
 const HOLE_OPTIONS: { value: HolesPlayed; label: string }[] = [
@@ -41,6 +42,17 @@ export default function NewRound() {
     return (
       <View style={[s.screen, s.content]}>
         <Text style={s.subtitle}>Only organizers can start new rounds.</Text>
+      </View>
+    );
+  }
+  if (trip.courses.length === 0) {
+    return (
+      <View style={[s.screen, s.content]}>
+        <Text style={s.title}>Add a course first</Text>
+        <Text style={s.subtitle}>A round needs a course and its scorecard.</Text>
+        <PressableLink href={`/trip/${trip.id}/course`} style={s.button}>
+          <Text style={s.buttonText}>Add a course</Text>
+        </PressableLink>
       </View>
     );
   }
@@ -110,11 +122,7 @@ export default function NewRound() {
       <Text style={s.label}>Holes</Text>
       <View style={s.pillRow}>
         {HOLE_OPTIONS.map((opt) => (
-          <Pressable
-            key={opt.value}
-            style={[s.pill, holesPlayed === opt.value && s.pillActive]}
-            onPress={() => setHolesPlayed(opt.value)}
-          >
+          <Pressable key={opt.value} style={[s.pill, holesPlayed === opt.value && s.pillActive]} onPress={() => setHolesPlayed(opt.value)}>
             <Text style={holesPlayed === opt.value ? s.pillTextActive : s.pillText}>{opt.label}</Text>
           </Pressable>
         ))}
@@ -123,11 +131,7 @@ export default function NewRound() {
       <Text style={s.label}>Players in this round</Text>
       <View style={s.pillRow}>
         {trip.players.map((p) => (
-          <Pressable
-            key={p.id}
-            style={[s.pill, selected.includes(p.id) && s.pillActive]}
-            onPress={() => toggleSelected(p.id)}
-          >
+          <Pressable key={p.id} style={[s.pill, selected.includes(p.id) && s.pillActive]} onPress={() => toggleSelected(p.id)}>
             <Text style={selected.includes(p.id) ? s.pillTextActive : s.pillText}>{p.name}</Text>
           </Pressable>
         ))}

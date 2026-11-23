@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,23 +6,16 @@ import { useAuth } from '../context/AuthContext';
 import { PressableLink } from '../components/NavCard';
 import { JoinCodeCard } from '../components/JoinCodeCard';
 import { CourseHero } from '../components/CourseHero';
-import { getLastTripId } from '../lib/storage';
 import { s, colors, icon } from '../lib/styles';
 
 // Demo event anyone can join to look around (Ryder Cup format).
 const DEMO_CODE = 'ad4b50adff';
 
-// Landing: straight into your last event; first-timers get a welcome screen.
+// Landing: My Events once you have any; first-timers get a welcome screen.
 export default function Landing() {
   const { trips, loaded, synced } = useTrips();
   const { displayName } = useAuth();
-  const [lastId, setLastId] = useState<string | null | undefined>(undefined);
-
-  useEffect(() => {
-    getLastTripId().then(setLastId);
-  }, []);
-
-  if (!loaded || !synced || lastId === undefined) {
+  if (!loaded || !synced) {
     return (
       <View style={[s.screen, { alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator color={colors.accent} />
@@ -31,10 +23,8 @@ export default function Landing() {
     );
   }
 
-  if (trips.length) {
-    const target = trips.find((t) => t.id === lastId) ?? [...trips].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0];
-    return <Redirect href={`/trip/${target.id}`} />;
-  }
+  // Returning users start on My Events; first-timers get the welcome screen.
+  if (trips.length) return <Redirect href="/events" />;
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={[s.content, { paddingTop: 24, gap: 16 }]} keyboardShouldPersistTaps="handled">
@@ -53,7 +43,7 @@ export default function Landing() {
       <View style={[s.card, { gap: 10 }]}>
         <Text style={s.title}>Running the trip?</Text>
         <Text style={s.subtitle}>Set up the format, courses, players and bets. Then invite everyone with one code.</Text>
-        <PressableLink href="/trip/new" style={s.buttonSecondary}>
+        <PressableLink href="/events?new=1" style={s.buttonSecondary}>
           <Ionicons name="add" size={icon.sm} color={colors.accent} />
           <Text style={s.buttonTextSecondary}>Create an event</Text>
         </PressableLink>
