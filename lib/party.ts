@@ -4,6 +4,8 @@ import { courseFor } from './scoring';
 // Party Mode: every gross birdie or better in the event (strokes <= par - 1).
 export interface PartyHole {
   key: string; // round:player:hole, what a phone remembers as already shown
+  roundId: string;
+  playerId: string;
   playerName: string;
   roundName: string;
   hole: number;
@@ -20,6 +22,8 @@ export function partyHoles(trip: Trip): PartyHole[] {
     if (!round || !par || !sc.strokes || sc.strokes > par - 1) continue;
     out.push({
       key: `${sc.roundId}:${sc.playerId}:${sc.holeNumber}`,
+      roundId: sc.roundId,
+      playerId: sc.playerId,
       playerName: trip.players.find((p) => p.id === sc.playerId)?.name ?? 'Someone',
       roundName: round.name,
       hole: sc.holeNumber,

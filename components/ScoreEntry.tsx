@@ -5,7 +5,7 @@ import { useTrips } from '../context/TripsContext';
 import { holeNumbersFor } from '../lib/holeRanges';
 import { strokesReceivedOnHole, courseHandicap, formatHandicap } from '../lib/handicap';
 import { leaderboard, matchPairings, matchStatus, courseFor, eventOf } from '../lib/scoring';
-import { PressableLink } from '../components/NavCard';
+import { router } from 'expo-router';
 import { s, colors, icon } from '../lib/styles';
 import { Trip, Round } from '../types/models';
 
@@ -22,7 +22,7 @@ const toParText = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`);
 // Index of the first hole someone still needs a score on (last hole if all done).
 function firstOpenHole(trip: Trip, round: Round, holes: number[]): number {
   const i = holes.findIndex((n) =>
-    round.playerIds.some((pid) => !trip.scores.some((sc) => sc.roundId === round.id && sc.playerId === pid && sc.holeNumber === n))
+    round.playerIds.some((pid) => !trip.scores.some((sc) => sc.roundId === round.id && sc.playerId === pid && sc.holeNumber === n)),
   );
   return i === -1 ? holes.length - 1 : i;
 }
@@ -32,7 +32,7 @@ const GAP = 8;
 
 // Hole-by-hole score entry for one round. Used by the round's Score screen and the event's Score tab.
 export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: string }) {
-  const { getTrip, recordScore } = useTrips();
+  const { getTrip, recordScore, finishHole } = useTrips();
   const trip = getTrip(tripId);
   const round = trip?.rounds.find((r) => r.id === roundId);
   const holes = round ? holeNumbersFor(round.holesPlayed) : [];
@@ -60,9 +60,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   const hole = course.holes.find((h) => h.number === holeNumber)!;
   // Your own player first (if you've said which one you are).
   const mine = trip.sync?.myPlayerId;
-  const players = trip.players
-    .filter((p) => round.playerIds.includes(p.id))
-    .sort((a, b) => (a.id === mine ? -1 : b.id === mine ? 1 : 0));
+  const players = trip.players.filter((p) => round.playerIds.includes(p.id)).sort((a, b) => (a.id === mine ? -1 : b.id === mine ? 1 : 0));
   const roundScores = trip.scores.filter((sc) => sc.roundId === roundId);
   const strokesFor = (playerId: string, n = holeNumber) =>
     roundScores.find((sc) => sc.playerId === playerId && sc.holeNumber === n)?.strokes;
@@ -71,6 +69,12 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   const isLast = index === holes.length - 1;
   const canAdvance = !isLast && holeDone(holeNumber);
   const roundDone = holes.every(holeDone);
+
+  // Scores on this hole are final: Party Mode alerts fire now (not mid-entry).
+  const nextHole = () => {
+    finishHole(tripId, roundId, holeNumber);
+    setIndex((i) => i + 1);
+  };
 
   const step = (playerId: string, delta: number) => {
     const current = strokesFor(playerId);
@@ -144,7 +148,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
             </Text>
           </View>
           <Pressable
-            onPress={() => setIndex((i) => i + 1)}
+            onPress={nextHole}
             disabled={!canAdvance}
             accessibilityRole="button"
             accessibilityLabel={canAdvance ? 'Next hole' : 'Next hole, enter every score first'}
@@ -187,8 +191,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
         {players.map((p) => {
           const strokes = strokesFor(p.id);
           const ch = courseHandicap(p.handicapIndex, course);
-          const popsOn = (n: number) =>
-            strokesReceivedOnHole(ch, course.holes.find((h) => h.number === n)?.strokeIndex ?? 99);
+          const popsOn = (n: number) => strokesReceivedOnHole(ch, course.holes.find((h) => h.number === n)?.strokeIndex ?? 99);
           const pops = popsOn(holeNumber);
           const strokeHoles = holes
             .filter((n) => popsOn(n) !== 0)
@@ -245,9 +248,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
               </View>
               <Text style={hb.strokeHoles}>
                 Course HCP {formatHandicap(ch)} ·{' '}
-                {strokeHoles.length
-                  ? `${ch < 0 ? 'gives back on' : 'strokes on'} ${strokeHoles.join(', ')}`
-                  : 'no strokes this round'}
+                {strokeHoles.length ? `${ch < 0 ? 'gives back on' : 'strokes on'} ${strokeHoles.join(', ')}` : 'no strokes this round'}
               </Text>
             </View>
           );
@@ -258,7 +259,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
         {!isLast && (
           <>
             <Pressable
-              onPress={() => setIndex((i) => i + 1)}
+              onPress={nextHole}
               disabled={!canAdvance}
               accessibilityRole="button"
               style={({ pressed }) => [s.button, { marginTop: 8 }, !canAdvance && s.disabled, pressed && s.pressed]}
@@ -266,16 +267,21 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
               <Text style={s.buttonText}>Next hole</Text>
               <Ionicons name="arrow-forward" size={icon.sm} color={colors.onAccent} />
             </Pressable>
-            {!canAdvance && (
-              <Text style={[s.subtitle, { textAlign: 'center' }]}>Enter a score for everyone to move on.</Text>
-            )}
+            {!canAdvance && <Text style={[s.subtitle, { textAlign: 'center' }]}>Enter a score for everyone to move on.</Text>}
           </>
         )}
         {isLast && roundDone && (
-          <PressableLink href={`${base}/leaderboard`} style={[s.button, { marginTop: 8 }]}>
+          <Pressable
+            onPress={() => {
+              finishHole(tripId, roundId, holeNumber);
+              router.push(`${base}/leaderboard`);
+            }}
+            accessibilityRole="link"
+            style={({ pressed }) => [s.button, { marginTop: 8 }, pressed && s.pressed]}
+          >
             <Ionicons name="podium" size={icon.sm} color={colors.onAccent} />
             <Text style={s.buttonText}>Round complete · see leaderboard</Text>
-          </PressableLink>
+          </Pressable>
         )}
       </ScrollView>
     </View>

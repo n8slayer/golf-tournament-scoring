@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadState, saveState, migrateTrip } from '../lib/storage';
 import { supabase } from '../lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
 import {
   fetchTrips,
@@ -62,6 +63,9 @@ interface TripsContextValue {
   removeCourse: (tripId: string, courseId: string) => void;
   createRound: (tripId: string, round: Omit<Round, 'id'>) => string;
   recordScore: (tripId: string, roundId: string, playerId: string, holeNumber: number, strokes: number) => void;
+  // Party Mode: a hole's scores are final (the scorer pressed Next hole); tells every phone.
+  finishHole: (tripId: string, roundId: string, holeNumber: number) => void;
+  finishedHoles: ReadonlySet<string>; // `${tripId}:${roundId}:${holeNumber}`
   joinEvent: (code: string) => Promise<string>;
   claimMyPlayer: (tripId: string, playerId: string) => Promise<void>;
   addMyself: (tripId: string, name: string, handicapIndex: number) => Promise<void>;
@@ -82,6 +86,9 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
   const tripsRef = useRef<Trip[]>([]);
   const userIdRef = useRef<string | null>(null);
   const queue = useRef<Op[]>([]);
+  const liveChannel = useRef<RealtimeChannel | null>(null);
+  const [finishedHoles, setFinishedHoles] = useState<ReadonlySet<string>>(new Set());
+  const markFinished = (key: string) => setFinishedHoles((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
   const flushing = useRef(false);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -264,7 +271,12 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
       })
       // Someone was made co-organizer / removed: reload roles.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_members' }, () => refresh())
+      .on('broadcast', { event: 'hole-finished' }, ({ payload }) => {
+        const p = payload as { tripId?: string; roundId?: string; holeNumber?: number };
+        if (p?.tripId && tripsRef.current.some((t) => t.id === p.tripId)) markFinished(`${p.tripId}:${p.roundId}:${p.holeNumber}`);
+      })
       .subscribe();
+    liveChannel.current = channel;
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active') refresh();
     });
@@ -273,6 +285,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     const win = typeof window !== 'undefined' && typeof window.addEventListener === 'function' ? window : null;
     win?.addEventListener('online', onOnline);
     return () => {
+      liveChannel.current = null;
       db.removeChannel(channel);
       sub.remove();
       win?.removeEventListener('online', onOnline);
@@ -407,6 +420,11 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     enqueue({ k: 'score', tripId, score });
   };
 
+  const finishHole = (tripId: string, roundId: string, holeNumber: number) => {
+    markFinished(`${tripId}:${roundId}:${holeNumber}`);
+    liveChannel.current?.send({ type: 'broadcast', event: 'hole-finished', payload: { tripId, roundId, holeNumber } }).catch(() => {});
+  };
+
   const joinEvent = async (code: string) => {
     if (!userIdRef.current) throw new Error('Sign in with your email first');
     const id = await joinTrip(code);
@@ -451,6 +469,8 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
         removeCourse,
         createRound,
         recordScore,
+        finishHole,
+        finishedHoles,
         joinEvent,
         claimMyPlayer,
         addMyself,

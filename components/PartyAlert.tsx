@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, Pressable, Switch, Vibration, AccessibilityInfo, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Trip } from '../types/models';
+import { useTrips } from '../context/TripsContext';
 import { eventOf } from '../lib/scoring';
 import { partyHoles, PartyHole } from '../lib/party';
 import { s, colors } from '../lib/styles';
@@ -18,7 +19,14 @@ export function PartyAlert({ trip }: { trip: Trip }) {
   const saved = useRef<Saved | null | undefined>(undefined); // undefined = still loading
   const [loaded, setLoaded] = useState(false);
   const [queue, setQueue] = useState<PartyHole[]>([]);
-  const holes = partyHoles(trip);
+  const { finishedHoles } = useTrips();
+  // A hole counts once its scorer pressed Next hole (live), or once that player has a score on a
+  // later hole (covers phones that missed the live message).
+  const holes = partyHoles(trip).filter(
+    (h) =>
+      finishedHoles.has(`${trip.id}:${h.roundId}:${h.hole}`) ||
+      trip.scores.some((sc) => sc.roundId === h.roundId && sc.playerId === h.playerId && sc.holeNumber > h.hole),
+  );
   const sig = holes.map((h) => h.key).join();
 
   useEffect(() => {
