@@ -1,23 +1,28 @@
-import { Trip, Round, Player, Score } from '../types/models';
-import { strokesReceivedOnHole } from './handicap';
+import { Trip, Round, Player, Score, Course } from '../types/models';
+import { strokesReceivedOnHole, courseHandicap } from './handicap';
 import { holeNumbersFor } from './holeRanges';
 
 function getPlayer(trip: Trip, playerId: string): Player | undefined {
   return trip.players.find((p) => p.id === playerId);
 }
 
-function getHole(trip: Trip, holeNumber: number) {
-  return trip.course.holes.find((h) => h.number === holeNumber);
+// The course a round is played on (falls back to the trip's first course).
+export function courseFor(trip: Trip, round: Round): Course {
+  return trip.courses.find((c) => c.id === round.courseId) ?? trip.courses[0];
+}
+
+function getHole(course: Course, holeNumber: number) {
+  return course.holes.find((h) => h.number === holeNumber);
 }
 
 function getScore(scores: Score[], playerId: string, holeNumber: number): Score | undefined {
   return scores.find((s) => s.playerId === playerId && s.holeNumber === holeNumber);
 }
 
-function netStrokes(trip: Trip, player: Player, holeNumber: number, strokes: number): number {
-  const hole = getHole(trip, holeNumber);
+function netStrokes(course: Course, player: Player, holeNumber: number, strokes: number): number {
+  const hole = getHole(course, holeNumber);
   if (!hole) return strokes;
-  return strokes - strokesReceivedOnHole(player.handicapIndex, hole.strokeIndex);
+  return strokes - strokesReceivedOnHole(courseHandicap(player.handicapIndex, course), hole.strokeIndex);
 }
 
 function roundScoresFor(trip: Trip, roundId: string): Score[] {
@@ -32,24 +37,28 @@ export interface LeaderboardRow {
   thru: number;
   gross: number;
   net: number;
+  netToPar: number; // over holes played so far
 }
 
 export function leaderboard(trip: Trip, round: Round): LeaderboardRow[] {
   const holes = holeNumbersFor(round.holesPlayed);
   const scores = roundScoresFor(trip, round.id);
+  const course = courseFor(trip, round);
   const rows: LeaderboardRow[] = round.playerIds.map((playerId) => {
     const player = getPlayer(trip, playerId);
     let gross = 0;
     let net = 0;
     let thru = 0;
+    let par = 0;
     for (const holeNumber of holes) {
       const s = getScore(scores, playerId, holeNumber);
       if (!s || !player) continue;
       gross += s.strokes;
-      net += netStrokes(trip, player, holeNumber, s.strokes);
+      net += netStrokes(course, player, holeNumber, s.strokes);
       thru += 1;
+      par += getHole(course, holeNumber)?.par ?? 0;
     }
-    return { playerId, playerName: player?.name ?? 'Unknown', thru, gross, net };
+    return { playerId, playerName: player?.name ?? 'Unknown', thru, gross, net, netToPar: net - par };
   });
   return rows.sort((a, b) => (a.thru === 0 && b.thru === 0 ? 0 : a.net - b.net));
 }
@@ -87,6 +96,7 @@ export interface MatchStatus {
 export function matchStatus(trip: Trip, round: Round, pairing: MatchPairing): MatchStatus {
   const holes = holeNumbersFor(round.holesPlayed);
   const scores = roundScoresFor(trip, round.id);
+  const course = courseFor(trip, round);
   const playerA = getPlayer(trip, pairing.playerAId);
   const playerB = getPlayer(trip, pairing.playerBId);
   let holesUp = 0;
@@ -99,8 +109,8 @@ export function matchStatus(trip: Trip, round: Round, pairing: MatchPairing): Ma
     const sb = getScore(scores, pairing.playerBId, holeNumber);
     if (!sa || !sb || !playerA || !playerB) break;
 
-    const netA = netStrokes(trip, playerA, holeNumber, sa.strokes);
-    const netB = netStrokes(trip, playerB, holeNumber, sb.strokes);
+    const netA = netStrokes(course, playerA, holeNumber, sa.strokes);
+    const netB = netStrokes(course, playerB, holeNumber, sb.strokes);
     if (netA < netB) holesUp += 1;
     else if (netB < netA) holesUp -= 1;
     through += 1;
@@ -138,6 +148,7 @@ export function skinsForRound(trip: Trip, round: Round): SkinResult[] {
   if (!round.skinsEnabled) return [];
   const holes = holeNumbersFor(round.holesPlayed);
   const scores = roundScoresFor(trip, round.id);
+  const course = courseFor(trip, round);
   const results: SkinResult[] = [];
 
   for (const holeNumber of holes) {
@@ -145,7 +156,7 @@ export function skinsForRound(trip: Trip, round: Round): SkinResult[] {
       const player = getPlayer(trip, playerId);
       const s = getScore(scores, playerId, holeNumber);
       if (!player || !s) return null;
-      return { playerId, net: netStrokes(trip, player, holeNumber, s.strokes) };
+      return { playerId, net: netStrokes(course, player, holeNumber, s.strokes) };
     });
     if (nets.some((n) => n === null)) continue; // skip holes not fully scored yet
 
@@ -173,13 +184,14 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export function computeSettlement(trip: Trip): SettlementLine[] {
+// Pass `rounds` to settle just those (e.g. one finished round); defaults to the whole trip.
+export function computeSettlement(trip: Trip, rounds: Round[] = trip.rounds): SettlementLine[] {
   const balances: Record<string, number> = {};
   const add = (playerId: string, amount: number) => {
     balances[playerId] = (balances[playerId] ?? 0) + amount;
   };
 
-  for (const round of trip.rounds) {
+  for (const round of rounds) {
     if (round.skinsEnabled) {
       const skins = skinsForRound(trip, round);
       for (const skin of skins) {
@@ -243,14 +255,16 @@ function selfCheck() {
       { id: 'A', name: 'Team A' },
       { id: 'B', name: 'Team B' },
     ],
-    course: {
+    courses: [{
+      id: 'c1',
       name: 'Test Course',
       holes: Array.from({ length: 18 }, (_, i) => ({ number: i + 1, par: 4, strokeIndex: i + 1 })),
-    },
+    }],
     rounds: [
       {
         id: 'r1',
         name: 'Round 1',
+        courseId: 'c1',
         date: new Date().toISOString(),
         holesPlayed: 'front9',
         skinsEnabled: true,

@@ -19,6 +19,7 @@ export default function NewRound() {
 
   const [name, setName] = useState('Round 1');
   const [holesPlayed, setHolesPlayed] = useState<HolesPlayed>('18');
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>(trip?.players.map((p) => p.id) ?? []);
   const [skinsEnabled, setSkinsEnabled] = useState(true);
   const [skinValue, setSkinValue] = useState('5');
@@ -26,14 +27,16 @@ export default function NewRound() {
   const [matchStake, setMatchStake] = useState('20');
 
   if (!trip) return null;
+  const chosenCourseId = courseId ?? trip.courses[0]?.id;
 
   const toggleSelected = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const submit = () => {
-    if (!name.trim() || selected.length === 0) return;
+    if (!name.trim() || selected.length === 0 || !chosenCourseId) return;
     const id = createRound(tripId, {
       name: name.trim(),
+      courseId: chosenCourseId,
       date: new Date().toISOString(),
       holesPlayed,
       skinsEnabled,
@@ -49,6 +52,24 @@ export default function NewRound() {
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
       <Text style={s.label}>Round name</Text>
       <TextInput style={s.input} value={name} onChangeText={setName} />
+
+      <Text style={s.label}>Course</Text>
+      <View style={s.pillRow}>
+        {trip.courses.map((c) => (
+          <Pressable
+            key={c.id}
+            style={[s.pill, chosenCourseId === c.id && s.pillActive]}
+            onPress={() => setCourseId(c.id)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: chosenCourseId === c.id }}
+          >
+            <Text style={chosenCourseId === c.id ? s.pillTextActive : s.pillText}>
+              {c.name}
+              {c.tee ? ` · ${c.tee}` : ''}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
       <Text style={s.label}>Holes</Text>
       <View style={s.pillRow}>
@@ -98,8 +119,13 @@ export default function NewRound() {
         </View>
       )}
 
-      <Pressable style={[s.button, { marginTop: 12 }]} onPress={submit}>
-        <Text style={s.buttonText}>Create Round</Text>
+      <Pressable
+        style={[s.button, { marginTop: 12 }, (selected.length === 0 || !name.trim()) && s.disabled]}
+        onPress={submit}
+        disabled={selected.length === 0 || !name.trim()}
+        accessibilityRole="button"
+      >
+        <Text style={s.buttonText}>Create round</Text>
       </Pressable>
     </ScrollView>
   );

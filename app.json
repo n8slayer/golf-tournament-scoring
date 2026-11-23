@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "golf-trip-app",
-    "slug": "golf-trip-app",
+    "slug": "golf-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,6 +24,17 @@
     "plugins": [
       "expo-router",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "22a613d5-ed80-4a31-9906-d1377881e010"
+      }
+    },
+    "owner": "nate69"
   }
 }

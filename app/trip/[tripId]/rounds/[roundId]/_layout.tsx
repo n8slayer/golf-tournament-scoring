@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams, Redirect } from 'expo-router';
+import { headerOptions } from '../../../../../lib/styles';
 import { useTrips } from '../../../../../context/TripsContext';
 
 export default function RoundLayout() {
@@ -10,7 +11,7 @@ export default function RoundLayout() {
   if (loaded && (!trip || !round)) return <Redirect href={`/trip/${tripId}`} />;
 
   return (
-    <Stack screenOptions={{ headerTitleStyle: { fontWeight: '700' } }}>
+    <Stack screenOptions={headerOptions}>
       <Stack.Screen name="index" options={{ title: round?.name ?? 'Round' }} />
       <Stack.Screen name="score" options={{ title: 'Score' }} />
       <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard' }} />

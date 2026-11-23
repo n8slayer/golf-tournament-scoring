@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTrips } from '../../../context/TripsContext';
 import { s } from '../../../lib/styles';
+import { formatHandicap } from '../../../lib/handicap';
 
 export default function Draft() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
@@ -40,14 +41,14 @@ export default function Draft() {
       <Text style={[s.label, { marginTop: 16 }]}>{teamA.name.toUpperCase()}</Text>
       {rosterFor(teamA.id).map((p, i) => (
         <Text key={p.id} style={s.subtitle}>
-          {i + 1}. {p.name} (HCP {p.handicapIndex})
+          {i + 1}. {p.name} (HCP {formatHandicap(p.handicapIndex)})
         </Text>
       ))}
 
       <Text style={[s.label, { marginTop: 16 }]}>{teamB.name.toUpperCase()}</Text>
       {rosterFor(teamB.id).map((p, i) => (
         <Text key={p.id} style={s.subtitle}>
-          {i + 1}. {p.name} (HCP {p.handicapIndex})
+          {i + 1}. {p.name} (HCP {formatHandicap(p.handicapIndex)})
         </Text>
       ))}
     </ScrollView>

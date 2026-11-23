@@ -1,7 +1,8 @@
-import { View, Text, FlatList, Pressable } from 'react-native';
-import { Link } from 'expo-router';
+import { View, Text, FlatList } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../context/TripsContext';
-import { s } from '../lib/styles';
+import { NavCard, PressableLink } from '../components/NavCard';
+import { s, colors, icon } from '../lib/styles';
 
 export default function TripList() {
   const { trips, loaded } = useTrips();
@@ -23,22 +24,29 @@ export default function TripList() {
         data={trips}
         keyExtractor={(t) => t.id}
         ListHeaderComponent={
-          <Link href="/trip/new" asChild>
-            <Pressable style={s.button}>
-              <Text style={s.buttonText}>+ New Trip</Text>
-            </Pressable>
-          </Link>
+          <View style={{ gap: 12, marginBottom: 4 }}>
+            <Text style={s.h1} accessibilityRole="header">Your trips</Text>
+            <Text style={s.subtitle}>Scores, skins, matches and who owes who, all in one place.</Text>
+            <PressableLink href="/trip/new" style={s.button}>
+                <Ionicons name="add" size={icon.md} color="#fff" />
+                <Text style={s.buttonText}>New trip</Text>
+              </PressableLink>
+          </View>
         }
-        ListEmptyComponent={<Text style={s.subtitle}>No trips yet — create one to get started.</Text>}
+        ListEmptyComponent={
+          <View style={[s.card, { alignItems: 'center', paddingVertical: 32 }]}>
+            <Ionicons name="golf-outline" size={40} color={colors.accent} />
+            <Text style={s.title}>No trips yet</Text>
+            <Text style={[s.subtitle, { textAlign: 'center' }]}>Create a trip, add your group and pick the course.</Text>
+          </View>
+        }
         renderItem={({ item }) => (
-          <Link href={`/trip/${item.id}`} asChild>
-            <Pressable style={s.card}>
-              <Text style={s.title}>{item.name}</Text>
-              <Text style={s.subtitle}>
-                {item.course.name} · {item.players.length} players · {item.rounds.length} rounds
-              </Text>
-            </Pressable>
-          </Link>
+          <NavCard
+            href={`/trip/${item.id}`}
+            icon="flag"
+            title={item.name}
+            subtitle={`${item.courses.map((c) => c.name).join(', ')} · ${item.players.length} players · ${item.rounds.length} rounds`}
+          />
         )}
       />
     </View>

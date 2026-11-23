@@ -1,26 +1,29 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { loadState, saveState } from '../lib/storage';
-import { Trip, Player, Round, HolesPlayed } from '../types/models';
+import { Trip, Player, Round, HolesPlayed, NewCourse } from '../types/models';
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function defaultHoles() {
-  return Array.from({ length: 18 }, (_, i) => ({ number: i + 1, par: 4, strokeIndex: i + 1 }));
 }
 
 interface TripsContextValue {
   trips: Trip[];
   loaded: boolean;
   getTrip: (tripId: string) => Trip | undefined;
-  addTrip: (name: string, courseName: string) => string;
+  addTrip: (name: string, courses: NewCourse[]) => string;
   addPlayer: (tripId: string, name: string, handicapIndex: number) => void;
   updatePlayer: (tripId: string, playerId: string, patch: Partial<Player>) => void;
   removePlayer: (tripId: string, playerId: string) => void;
   ensureTeams: (tripId: string) => void;
   assignPlayerToTeam: (tripId: string, playerId: string, teamId: string) => void;
-  updateHole: (tripId: string, holeNumber: number, patch: { par?: number; strokeIndex?: number }) => void;
+  updateHole: (
+    tripId: string,
+    courseId: string,
+    holeNumber: number,
+    patch: { par?: number; strokeIndex?: number }
+  ) => void;
+  addCourse: (tripId: string, course: NewCourse) => string;
+  removeCourse: (tripId: string, courseId: string) => void;
   createRound: (tripId: string, round: Omit<Round, 'id'>) => string;
   recordScore: (tripId: string, roundId: string, playerId: string, holeNumber: number, strokes: number) => void;
 }
@@ -51,7 +54,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     setTrips((prev) => prev.map((t) => (t.id === tripId ? updater(t) : t)));
   };
 
-  const addTrip = (name: string, courseName: string) => {
+  const addTrip = (name: string, courses: NewCourse[]) => {
     const id = genId();
     const trip: Trip = {
       id,
@@ -59,7 +62,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
       players: [],
       teams: [],
-      course: { name: courseName, holes: defaultHoles() },
+      courses: courses.map((c) => ({ ...c, id: genId() })),
       rounds: [],
       scores: [],
     };
@@ -104,14 +107,33 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const updateHole = (tripId: string, holeNumber: number, patch: { par?: number; strokeIndex?: number }) => {
+  const updateHole = (
+    tripId: string,
+    courseId: string,
+    holeNumber: number,
+    patch: { par?: number; strokeIndex?: number }
+  ) => {
     updateTrip(tripId, (t) => ({
       ...t,
-      course: {
-        ...t.course,
-        holes: t.course.holes.map((h) => (h.number === holeNumber ? { ...h, ...patch } : h)),
-      },
+      courses: t.courses.map((c) =>
+        c.id === courseId ? { ...c, holes: c.holes.map((h) => (h.number === holeNumber ? { ...h, ...patch } : h)) } : c
+      ),
     }));
+  };
+
+  const addCourse = (tripId: string, course: NewCourse) => {
+    const id = genId();
+    updateTrip(tripId, (t) => ({ ...t, courses: [...t.courses, { ...course, id }] }));
+    return id;
+  };
+
+  // Courses with rounds on them are kept so those rounds still score.
+  const removeCourse = (tripId: string, courseId: string) => {
+    updateTrip(tripId, (t) =>
+      t.rounds.some((r) => r.courseId === courseId) || t.courses.length <= 1
+        ? t
+        : { ...t, courses: t.courses.filter((c) => c.id !== courseId) }
+    );
   };
 
   const createRound = (tripId: string, round: Omit<Round, 'id'>) => {
@@ -142,6 +164,8 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
         ensureTeams,
         assignPlayerToTeam,
         updateHole,
+        addCourse,
+        removeCourse,
         createRound,
         recordScore,
       }}

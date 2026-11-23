@@ -2,7 +2,7 @@ import { View, Text, FlatList } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTrips } from '../../../context/TripsContext';
 import { computeSettlement } from '../../../lib/scoring';
-import { s } from '../../../lib/styles';
+import { s, colors } from '../../../lib/styles';
 
 export default function Settlement() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
@@ -28,7 +28,7 @@ export default function Settlement() {
             <Text style={s.title}>
               {nameOf(item.fromPlayerId)} → {nameOf(item.toPlayerId)}
             </Text>
-            <Text style={[s.subtitle, { fontSize: 18, fontWeight: '700', color: '#1b7a43' }]}>
+            <Text style={[s.subtitle, { fontSize: 18, fontWeight: '700', color: colors.accent }]}>
               ${item.amount.toFixed(2)}
             </Text>
           </View>

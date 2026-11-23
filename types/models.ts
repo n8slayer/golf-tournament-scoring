@@ -14,12 +14,20 @@ export interface Hole {
   number: number; // 1-18
   par: number;
   strokeIndex: number; // 1-18 difficulty rank, unique per hole
+  yardage?: number;
 }
 
 export interface Course {
+  id: string;
   name: string;
   holes: Hole[]; // length 18
+  tee?: string;
+  // From the tee's scorecard; when both are set, players get course handicaps.
+  slope?: number;
+  rating?: number;
 }
+
+export type NewCourse = Omit<Course, 'id'>;
 
 export type HolesPlayed = 'front9' | 'back9' | '18';
 
@@ -27,6 +35,7 @@ export interface Round {
   id: string;
   name: string;
   date: string; // ISO date
+  courseId: string;
   holesPlayed: HolesPlayed;
   skinsEnabled: boolean;
   skinValue: number;
@@ -49,7 +58,7 @@ export interface Trip {
   createdAt: string;
   players: Player[];
   teams: Team[]; // 0 or 2 entries
-  course: Course;
+  courses: Course[]; // at least one
   rounds: Round[];
   scores: Score[];
 }
