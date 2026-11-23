@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, Switch, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTrips } from '../../../../context/TripsContext';
@@ -24,6 +24,11 @@ export default function NewRound() {
   const [holesPlayed, setHolesPlayed] = useState<HolesPlayed>('18');
   const [courseId, setCourseId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>(trip?.players.map((p) => p.id) ?? []);
+  // Opened directly (event still loading): select everyone once it arrives.
+  const playerCount = trip?.players.length ?? 0;
+  useEffect(() => {
+    if (playerCount && selected.length === 0) setSelected(trip!.players.map((p) => p.id));
+  }, [playerCount]);
   const [skinsEnabled, setSkinsEnabled] = useState(true);
   const [skinValue, setSkinValue] = useState(String(event?.skinValue ?? 5));
   const [matchEnabled, setMatchEnabled] = useState(event ? event.type === 'rydercup' : true);
@@ -48,7 +53,9 @@ export default function NewRound() {
 
   const hasTeams = trip.teams.length === 2;
   const matches: Slots[] = slots ?? defaultPairings(trip, selected, format);
-  const matchesOk = !matchEnabled || !hasTeams || isComplete(matches);
+  // No matches (e.g. players not on teams yet) is fine: the round is stroke play + skins.
+  const matchesOk = !matchEnabled || !hasTeams || matches.length === 0 || isComplete(matches);
+  const withMatches = matchEnabled && hasTeams && matches.length > 0;
   const canCreate = selected.length > 0 && !!name.trim() && matchesOk;
 
   const submit = () => {
@@ -60,10 +67,10 @@ export default function NewRound() {
       holesPlayed,
       skinsEnabled,
       skinValue: parseFloat(skinValue) || 0,
-      matchEnabled,
+      matchEnabled: withMatches,
       matchStake: parseFloat(matchStake) || 0,
       playerIds: selected,
-      ...(matchEnabled && hasTeams
+      ...(withMatches
         ? {
             format,
             matches: matches.map((m, i) => ({

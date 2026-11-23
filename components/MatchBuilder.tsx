@@ -1,6 +1,7 @@
 import { View, Text, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { s, colors, icon } from '../lib/styles';
+import { PressableLink } from './NavCard';
 import { Trip, MatchFormat } from '../types/models';
 
 export type Slots = { sideA: (string | null)[]; sideB: (string | null)[] };
@@ -84,6 +85,23 @@ export function MatchBuilder({
       </View>
 
       <Text style={s.label}>Matches</Text>
+      {matches.length === 0 && (
+        <View style={[s.card, { gap: 6 }]}>
+          <Text style={s.title}>No matches yet</Text>
+          <Text style={s.subtitle}>
+            {roster(teamA.id).length && roster(teamB.id).length
+              ? 'Add a match below to pair players.'
+              : `Matches pair ${teamA.name} against ${teamB.name}, but ${
+                  roster(teamA.id).length ? teamB.name : roster(teamB.id).length ? teamA.name : 'neither team'
+                } has anyone in this round yet. Put players on teams first.`}{' '}
+            You can also start the round without matches (stroke play and skins only).
+          </Text>
+          <PressableLink href={`/trip/${trip.id}/draft`} style={[s.buttonSecondary, { minHeight: 44 }]}>
+            <Ionicons name="shuffle" size={icon.sm} color={colors.accent} />
+            <Text style={s.buttonTextSecondary}>Teams & draft</Text>
+          </PressableLink>
+        </View>
+      )}
       {matches.map((m, mi) => (
         <View key={mi} style={[s.card, { gap: 8 }]}>
           <View style={s.row}>
@@ -111,7 +129,7 @@ export function MatchBuilder({
         <Ionicons name="add" size={icon.sm} color={colors.accent} />
         <Text style={s.buttonTextSecondary}>Add match</Text>
       </Pressable>
-      {!isComplete(matches) && (
+      {matches.length > 0 && !isComplete(matches) && (
         <Text style={s.subtitle}>Fill every slot (or remove empty matches) to create the round.</Text>
       )}
     </View>
