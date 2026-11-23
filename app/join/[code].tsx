@@ -12,7 +12,7 @@ import { s, colors, icon } from '../../lib/styles';
 // Invite link landing: join the event, then pick (or add) which player you are.
 export default function Join() {
   const { code } = useLocalSearchParams<{ code: string }>();
-  const { sharing, joinEvent, getTrip, claimMyPlayer, addMyself } = useTrips();
+  const { sharing, joinEvent, getTrip, claimMyPlayer, addMyself, userId } = useTrips();
   const router = useRouter();
   const [tripId, setTripId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -29,7 +29,7 @@ export default function Join() {
   }, [tripId]);
 
   useEffect(() => {
-    if (!sharing || !code) return;
+    if (!sharing || !code || !userId) return; // wait for the saved sign-in to load
     joinEvent(code)
       .then(setTripId)
       .catch((e) =>
@@ -39,7 +39,7 @@ export default function Join() {
             : `Could not join: ${e?.message ?? e}`,
         ),
       );
-  }, [code, sharing]);
+  }, [code, sharing, userId]);
 
   const done = () => router.replace(`/trip/${tripId}`);
   const run = async (fn: () => Promise<void>) => {
