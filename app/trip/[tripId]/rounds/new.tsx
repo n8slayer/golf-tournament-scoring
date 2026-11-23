@@ -71,6 +71,9 @@ export default function NewRound() {
   const withMatches = matchEnabled && hasTeams && matches.length > 0;
   // One ball per side: no individual scores, so no skins.
   const teamBall = withMatches && isTeamBall(format);
+  // With matches, only the players in a match play this round (others would block scoring and skins).
+  const inMatches = withMatches ? selected.filter((id) => matches.some((m) => [...m.sideA, ...m.sideB].includes(id))) : selected;
+  const leftOut = selected.filter((id) => !inMatches.includes(id)).map((id) => trip.players.find((p) => p.id === id)?.name ?? '?');
   const canCreate = selected.length > 0 && !!name.trim() && matchesOk;
 
   const submit = () => {
@@ -84,7 +87,7 @@ export default function NewRound() {
       skinValue: parseFloat(skinValue) || 0,
       matchEnabled: withMatches,
       matchStake: parseFloat(matchStake) || 0,
-      playerIds: selected,
+      playerIds: inMatches,
       ...(withMatches
         ? {
             format,
@@ -167,19 +170,26 @@ export default function NewRound() {
             <TextInput style={s.input} value={matchStake} onChangeText={setMatchStake} keyboardType="decimal-pad" />
           </View>
           {hasTeams ? (
-            <MatchBuilder
-              trip={trip}
-              playerIds={selected}
-              format={format}
-              onFormat={(f) => {
-                setFormat(f);
-                setSlots(null);
-              }}
-              allowance={allowance}
-              onAllowance={setAllowance}
-              matches={matches}
-              onChange={setSlots}
-            />
+            <>
+              <MatchBuilder
+                trip={trip}
+                playerIds={selected}
+                format={format}
+                onFormat={(f) => {
+                  setFormat(f);
+                  setSlots(null);
+                }}
+                allowance={allowance}
+                onAllowance={setAllowance}
+                matches={matches}
+                onChange={setSlots}
+              />
+              {leftOut.length > 0 && (
+                <Text style={s.subtitle}>
+                  Not in a match, so not playing this round: {leftOut.join(', ')}. Add another match to include them.
+                </Text>
+              )}
+            </>
           ) : (
             <Text style={s.subtitle}>Run the Team Draft first to set up matches.</Text>
           )}
