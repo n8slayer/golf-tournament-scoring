@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx expo export -p web",
+  "buildCommand": "EXPO_PUBLIC_BUILD_ID=$VERCEL_GIT_COMMIT_SHA npx expo export -p web && printf '{\"id\":\"%s\"}' \"$VERCEL_GIT_COMMIT_SHA\" > dist/version.json",
   "outputDirectory": "dist",
   "devCommand": "npx expo start --web",
   "cleanUrls": true,

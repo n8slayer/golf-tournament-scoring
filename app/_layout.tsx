@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { headerOptions, s, colors } from '../lib/styles';
 import { TripsProvider } from '../context/TripsContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { UpdateBanner } from '../components/UpdateBanner';
 
 // Everyone signs in (email code) before using shared events; the page they were going to
 // (e.g. an invite link) is passed as ?next= so they land there afterwards.
@@ -37,6 +38,7 @@ export default function RootLayout() {
           <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
         </Stack>
         <AuthGate />
+        <UpdateBanner />
         <StatusBar style="light" />
       </TripsProvider>
     </AuthProvider>
