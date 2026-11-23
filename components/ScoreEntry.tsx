@@ -119,19 +119,21 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   // Who's up: match play status first (if on), then net standings.
   const nameOf = (id: string) => trip.players.find((p) => p.id === id)?.name ?? '?';
   const matches = round.matchEnabled
-    ? matchPairings(trip, round).map((pairing) => {
-        const st = matchStatus(trip, round, pairing);
-        const a = pairing.sideA.map(nameOf).join(' & ');
-        const b = pairing.sideB.map(nameOf).join(' & ');
-        if (st.through === 0) return `${a} vs ${b} · not started`;
-        if (st.holesUp === 0) return `${a} vs ${b} · ${st.resultLabel}`;
-        const leader = st.holesUp > 0 ? a : b;
-        const won = st.closedOut || st.through === holes.length;
-        return `${leader} ${won ? 'wins' : ''} ${st.resultLabel}`.replace(/\s+/g, ' ');
-      })
+    ? matchPairings(trip, round)
+        .filter((pairing) => [...pairing.sideA, ...pairing.sideB].some((id) => group.includes(id)))
+        .map((pairing) => {
+          const st = matchStatus(trip, round, pairing);
+          const a = pairing.sideA.map(nameOf).join(' & ');
+          const b = pairing.sideB.map(nameOf).join(' & ');
+          if (st.through === 0) return `${a} vs ${b} · not started`;
+          if (st.holesUp === 0) return `${a} vs ${b} · ${st.resultLabel}`;
+          const leader = st.holesUp > 0 ? a : b;
+          const won = st.closedOut || st.through === holes.length;
+          return `${leader} ${won ? 'wins' : ''} ${st.resultLabel}`.replace(/\s+/g, ' ');
+        })
     : [];
   // Individual net standings mean nothing when each side plays one ball: show only the match status then.
-  const standings = sides.length ? [] : leaderboard(trip, round).filter((r) => r.thru > 0);
+  const standings = sides.length ? [] : leaderboard(trip, round).filter((r) => r.thru > 0 && group.includes(r.playerId));
 
   const base = `/trip/${tripId}/rounds/${roundId}`;
 
