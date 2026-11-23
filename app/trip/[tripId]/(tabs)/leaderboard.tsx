@@ -1,5 +1,5 @@
 import { View, Text, ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useGlobalSearchParams } from 'expo-router';
 import { useTrips } from '../../../../context/TripsContext';
 import { MatchBoard, TeamScoreHeader } from '../../../../components/MatchBoard';
 import { StandingsBoard } from '../../../../components/StandingsBoard';
@@ -9,7 +9,7 @@ import { s } from '../../../../lib/styles';
 
 // Event leaderboard: the match board for Ryder Cup, TV standings otherwise, plus each round's board.
 export default function LeaderboardTab() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId } = useGlobalSearchParams<{ tripId: string }>();
   const { getTrip } = useTrips();
   const trip = getTrip(tripId);
   if (!trip) return null;

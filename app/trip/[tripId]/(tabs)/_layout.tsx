@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Tabs, useLocalSearchParams } from 'expo-router';
+import { Tabs, useGlobalSearchParams } from 'expo-router';
 import type { ColorValue } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../context/TripsContext';
@@ -11,7 +11,7 @@ const icon = (name: IconName) => ({ color, size }: { color: ColorValue; size: nu
 
 // Bottom tab bar inside an event.
 export default function EventTabs() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId } = useGlobalSearchParams<{ tripId: string }>();
   const { getTrip } = useTrips();
   const trip = getTrip(tripId);
 

@@ -1,5 +1,5 @@
 import { View, Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useGlobalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../context/TripsContext';
 import { ScoreEntry } from '../../../../components/ScoreEntry';
@@ -22,7 +22,7 @@ function currentRound(trip: Trip) {
 }
 
 export default function ScoreTab() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId } = useGlobalSearchParams<{ tripId: string }>();
   const { getTrip, canEdit } = useTrips();
   const trip = getTrip(tripId);
   if (!trip) return null;

@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useGlobalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../context/TripsContext';
 import { useAuth } from '../../../../context/AuthContext';
@@ -10,7 +10,7 @@ import { s, colors, icon } from '../../../../lib/styles';
 
 // Everything that isn't Home / Score / Leaderboard: invite, setup, switching events, account.
 export default function MoreTab() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId } = useGlobalSearchParams<{ tripId: string }>();
   const { getTrip, canEdit } = useTrips();
   const { user, displayName, signOut } = useAuth();
   const trip = getTrip(tripId);

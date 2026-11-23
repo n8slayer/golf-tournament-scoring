@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Share, Platform } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useGlobalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../context/TripsContext';
@@ -212,7 +212,7 @@ function MoneyTab({ trip }: { trip: Trip }) {
 }
 
 export default function EventHome() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId } = useGlobalSearchParams<{ tripId: string }>();
   const { getTrip, canEdit, offline, pending } = useTrips();
   const [tab, setTab] = useState<'rounds' | 'players' | 'money'>('rounds');
   const trip = getTrip(tripId);
