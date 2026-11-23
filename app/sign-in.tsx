@@ -38,6 +38,7 @@ export default function SignIn() {
   useEffect(() => {
     if (user && displayName) finish();
     else if (user && step !== 'name') setStep('name');
+    else if (!user && step === 'name') setStep('email'); // signed out (e.g. expired) while on the name step
   }, [user, displayName]);
 
   const run = async (fn: () => Promise<void>) => {

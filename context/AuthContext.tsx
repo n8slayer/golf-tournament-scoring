@@ -4,8 +4,7 @@ import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 
 // Where the email's link should land (web: this site's sign-in page, which finishes setup).
-const redirectTo = () =>
-  Platform.OS === 'web' && typeof window !== 'undefined' ? `${window.location.origin}/sign-in` : undefined;
+const redirectTo = () => (Platform.OS === 'web' && typeof window !== 'undefined' ? `${window.location.origin}/sign-in` : undefined);
 
 // Email-code sign-in. An existing anonymous session (from before accounts) is upgraded in
 // place with updateUser({ email }), keeping the same user id, events and organizer rights.
@@ -97,8 +96,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setDisplayName = async (name: string) => {
-    const { data } = await db().auth.getUser();
-    if (!data.user) throw new Error('Not signed in');
+    const { data, error: authError } = await db().auth.getUser();
+    if (!data.user) {
+      // A network failure is not a sign-out: keep the session and let them retry.
+      if (authError && /fetch|network/i.test(authError.message)) throw new Error('No connection. Check your signal and try again.');
+      // The server no longer accepts this saved sign-in (expired, or the account was removed): start over.
+      await db().auth.signOut({ scope: 'local' });
+      throw new Error('Your sign-in expired. Enter your email to sign in again.');
+    }
     const { error } = await db().from('profiles').upsert({ id: data.user.id, display_name: name.trim() });
     if (error) throw error;
     setName(name.trim());
