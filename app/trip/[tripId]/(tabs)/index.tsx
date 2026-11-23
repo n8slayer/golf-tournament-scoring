@@ -264,6 +264,11 @@ export default function EventHome() {
         {heroCourse && <Text style={[st.onPhoto, { color: colors.text, fontWeight: '600' }]}>{heroCourse.name}</Text>}
       </CourseHero>
       <CodePill trip={trip} />
+      {event.partyMode && (
+        <View style={{ alignItems: 'center' }}>
+          <Chip text="🍻 PARTY MODE · BIRDIES = DRINKS" tone="gold" />
+        </View>
+      )}
 
       {(offline || pending > 0) && (
         <Text style={[s.subtitle, { color: offline ? colors.danger : colors.muted }]}>

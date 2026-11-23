@@ -5,13 +5,14 @@ import { useTrips } from '../../../../context/TripsContext';
 import { useAuth } from '../../../../context/AuthContext';
 import { NavCard } from '../../../../components/NavCard';
 import { ShareCard } from '../../../../components/ShareCard';
+import { PartyModeSwitch } from '../../../../components/PartyAlert';
 import { eventOf } from '../../../../lib/scoring';
 import { s, colors, icon } from '../../../../lib/styles';
 
 // Everything that isn't Home / Score / Leaderboard: invite, setup, switching events, account.
 export default function MoreTab() {
   const { tripId } = useGlobalSearchParams<{ tripId: string }>();
-  const { getTrip, canEdit } = useTrips();
+  const { getTrip, canEdit, updateEvent } = useTrips();
   const { user, displayName, signOut } = useAuth();
   const trip = getTrip(tripId);
   if (!trip) return null;
@@ -42,14 +43,36 @@ export default function MoreTab() {
           href={`${base}/people`}
           icon="people-circle"
           title="People & roles"
-          subtitle={trip.sync.role === 'owner' ? 'You’re the organizer · add co-organizers' : trip.sync.role === 'admin' ? 'You’re a co-organizer' : 'Who’s in this event'}
+          subtitle={
+            trip.sync.role === 'owner'
+              ? 'You’re the organizer · add co-organizers'
+              : trip.sync.role === 'admin'
+                ? 'You’re a co-organizer'
+                : 'Who’s in this event'
+          }
         />
       )}
-      <NavCard href={`${base}/players`} icon="people" title="Players" subtitle={editor ? 'Add players and handicaps' : `${trip.players.length} players`} />
-      <NavCard href={`${base}/course`} icon="map" title={trip.courses.length === 1 ? 'Course & scorecard' : 'Courses & scorecards'} subtitle={trip.courses.map((c) => c.name).join(', ')} />
+      <NavCard
+        href={`${base}/players`}
+        icon="people"
+        title="Players"
+        subtitle={editor ? 'Add players and handicaps' : `${trip.players.length} players`}
+      />
+      <NavCard
+        href={`${base}/course`}
+        icon="map"
+        title={trip.courses.length === 1 ? 'Course & scorecard' : 'Courses & scorecards'}
+        subtitle={trip.courses.map((c) => c.name).join(', ')}
+      />
       {eventOf(trip).type === 'rydercup' && (
-        <NavCard href={`${base}/draft`} icon="shuffle" title="Teams & draft" subtitle={trip.teams.length === 2 ? trip.teams.map((t) => t.name).join(' vs ') : 'Not started'} />
+        <NavCard
+          href={`${base}/draft`}
+          icon="shuffle"
+          title="Teams & draft"
+          subtitle={trip.teams.length === 2 ? trip.teams.map((t) => t.name).join(' vs ') : 'Not started'}
+        />
       )}
+      <PartyModeSwitch value={!!eventOf(trip).partyMode} onChange={editor ? (v) => updateEvent(trip.id, { partyMode: v }) : undefined} />
       <NavCard href={`${base}/settlement`} icon="cash" title="Settle up" subtitle="Who owes who across all rounds" />
 
       <Text style={[s.label, { marginTop: 8 }]}>App</Text>

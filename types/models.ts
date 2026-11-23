@@ -74,6 +74,7 @@ export interface EventSettings {
   endDate?: string;
   skinValue: number; // defaults for new rounds
   matchStake: number;
+  partyMode?: boolean; // alert everyone on a gross birdie or better
 }
 
 export interface Trip {

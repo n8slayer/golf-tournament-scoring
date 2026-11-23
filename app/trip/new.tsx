@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips, TripSetup } from '../../context/TripsContext';
 import { CourseSearch, courseSummary } from '../../components/CourseSearch';
+import { PartyModeSwitch } from '../../components/PartyAlert';
 import { PlayerForm } from '../../components/PlayerForm';
 import { formatHandicap } from '../../lib/handicap';
 import { s, colors, icon } from '../../lib/styles';
@@ -51,6 +52,7 @@ export default function NewTrip() {
   const [teamNames, setTeamNames] = useState<[string, string]>(['Team A', 'Team B']);
   const [skinValue, setSkinValue] = useState('5');
   const [matchStake, setMatchStake] = useState('20');
+  const [partyMode, setPartyMode] = useState(false);
 
   const ryder = type === 'rydercup';
   const dateError =
@@ -76,6 +78,7 @@ export default function NewTrip() {
         ...(endDate ? { endDate } : {}),
         skinValue: Math.max(0, parseFloat(skinValue) || 0),
         matchStake: Math.max(0, parseFloat(matchStake) || 0),
+        ...(partyMode ? { partyMode } : {}),
       },
       players: players.map(({ team, ...rest }) => (ryder ? { ...rest, team } : rest)),
       ...(ryder ? { teamNames: [teamNames[0].trim(), teamNames[1].trim()] as [string, string] } : {}),
@@ -273,6 +276,7 @@ export default function NewTrip() {
             />
           </View>
         </View>
+        <PartyModeSwitch value={partyMode} onChange={setPartyMode} />
       </Section>
 
       <Pressable

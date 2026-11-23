@@ -18,6 +18,7 @@ import {
   isNetworkError,
 } from '../lib/sync';
 import { Trip, Player, Round, HolesPlayed, NewCourse, EventSettings, Score } from '../types/models';
+import { eventOf } from '../lib/scoring';
 
 // Everything the setup page collects. team: 0 / 1 = first / second team, undefined = draft later.
 export interface TripSetup {
@@ -35,8 +36,7 @@ function genId(): string {
 // Writes waiting for the server (kept across restarts for bad signal on the course).
 const PENDING_KEY = 'golf-trip-app:pending:v1';
 type Op = { k: 'trip'; tripId: string } | { k: 'score'; tripId: string; score: Score };
-const sameScore = (a: Score, b: Score) =>
-  a.roundId === b.roundId && a.playerId === b.playerId && a.holeNumber === b.holeNumber;
+const sameScore = (a: Score, b: Score) => a.roundId === b.roundId && a.playerId === b.playerId && a.holeNumber === b.holeNumber;
 
 interface TripsContextValue {
   trips: Trip[];
@@ -55,13 +55,9 @@ interface TripsContextValue {
   removePlayer: (tripId: string, playerId: string) => void;
   ensureTeams: (tripId: string) => void;
   renameTeam: (tripId: string, teamId: string, name: string) => void;
+  updateEvent: (tripId: string, patch: Partial<EventSettings>) => void;
   assignPlayerToTeam: (tripId: string, playerId: string, teamId: string) => void;
-  updateHole: (
-    tripId: string,
-    courseId: string,
-    holeNumber: number,
-    patch: { par?: number; strokeIndex?: number }
-  ) => void;
+  updateHole: (tripId: string, courseId: string, holeNumber: number, patch: { par?: number; strokeIndex?: number }) => void;
   addCourse: (tripId: string, course: NewCourse) => string;
   removeCourse: (tripId: string, courseId: string) => void;
   createRound: (tripId: string, round: Omit<Round, 'id'>) => string;
@@ -238,11 +234,18 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     const channel = db
       .channel('golf-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, (payload) => {
-        const row = payload.new as { trip_id?: string; round_id: string; player_id: string; hole_number: number; strokes: number; updated_by?: string };
+        const row = payload.new as {
+          trip_id?: string;
+          round_id: string;
+          player_id: string;
+          hole_number: number;
+          strokes: number;
+          updated_by?: string;
+        };
         if (!row?.trip_id || row.updated_by === userIdRef.current) return;
         const score = { roundId: row.round_id, playerId: row.player_id, holeNumber: row.hole_number, strokes: row.strokes };
         commit((prev) =>
-          prev.map((t) => (t.id === row.trip_id ? { ...t, scores: [...t.scores.filter((s) => !sameScore(s, score)), score] } : t))
+          prev.map((t) => (t.id === row.trip_id ? { ...t, scores: [...t.scores.filter((s) => !sameScore(s, score)), score] } : t)),
         );
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trips' }, (payload) => {
@@ -256,7 +259,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
             const emailOf = new Map(t.players.filter((p) => p.email).map((p) => [p.id, p.email]));
             const next = migrateTrip({ ...row.data, id: t.id, scores: t.scores, sync: t.sync });
             return { ...next, players: next.players.map((p) => (emailOf.has(p.id) ? { ...p, email: emailOf.get(p.id) } : p)) };
-          })
+          }),
         );
       })
       // Someone was made co-organizer / removed: reload roles.
@@ -323,6 +326,10 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
+  const updateEvent = (tripId: string, patch: Partial<EventSettings>) => {
+    updateTrip(tripId, (t) => ({ ...t, event: { ...eventOf(t), ...patch } }));
+  };
+
   const updatePlayer = (tripId: string, playerId: string, patch: Partial<Player>) => {
     updateTrip(tripId, (t) => ({
       ...t,
@@ -338,7 +345,13 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     updateTrip(tripId, (t) =>
       t.teams.length === 2
         ? t
-        : { ...t, teams: [{ id: genId(), name: 'Team A' }, { id: genId(), name: 'Team B' }] }
+        : {
+            ...t,
+            teams: [
+              { id: genId(), name: 'Team A' },
+              { id: genId(), name: 'Team B' },
+            ],
+          },
     );
   };
 
@@ -357,16 +370,11 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const updateHole = (
-    tripId: string,
-    courseId: string,
-    holeNumber: number,
-    patch: { par?: number; strokeIndex?: number }
-  ) => {
+  const updateHole = (tripId: string, courseId: string, holeNumber: number, patch: { par?: number; strokeIndex?: number }) => {
     updateTrip(tripId, (t) => ({
       ...t,
       courses: t.courses.map((c) =>
-        c.id === courseId ? { ...c, holes: c.holes.map((h) => (h.number === holeNumber ? { ...h, ...patch } : h)) } : c
+        c.id === courseId ? { ...c, holes: c.holes.map((h) => (h.number === holeNumber ? { ...h, ...patch } : h)) } : c,
       ),
     }));
   };
@@ -382,7 +390,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     updateTrip(tripId, (t) =>
       t.rounds.some((r) => r.courseId === courseId) || t.courses.length <= 1
         ? t
-        : { ...t, courses: t.courses.filter((c) => c.id !== courseId) }
+        : { ...t, courses: t.courses.filter((c) => c.id !== courseId) },
     );
   };
 
@@ -395,9 +403,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
   // Anyone in the event can score.
   const recordScore = (tripId: string, roundId: string, playerId: string, holeNumber: number, strokes: number) => {
     const score = { roundId, playerId, holeNumber, strokes };
-    commit((prev) =>
-      prev.map((t) => (t.id === tripId ? { ...t, scores: [...t.scores.filter((s) => !sameScore(s, score)), score] } : t))
-    );
+    commit((prev) => prev.map((t) => (t.id === tripId ? { ...t, scores: [...t.scores.filter((s) => !sameScore(s, score)), score] } : t)));
     enqueue({ k: 'score', tripId, score });
   };
 
@@ -435,6 +441,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
         addTrip,
         addPlayer,
         updatePlayer,
+        updateEvent,
         removePlayer,
         ensureTeams,
         renameTeam,
