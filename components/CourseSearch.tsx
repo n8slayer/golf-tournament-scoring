@@ -9,6 +9,7 @@ import {
   isUsableTee,
   teeToHoles,
   blankCourse,
+  COURSE_API_MOCK,
   CourseSummary,
   CourseDetail,
 } from '../lib/courseApi';
@@ -61,6 +62,11 @@ export function CourseSearch({ onAdd, title = 'Add a course' }: { onAdd: (course
   return (
     <View style={s.card}>
       <Text style={s.label}>{title}</Text>
+      {COURSE_API_MOCK && (
+        <Text style={[s.subtitle, { color: colors.danger, fontWeight: '700' }]}>
+          Test mode: sample courses only, no API requests used.
+        </Text>
+      )}
       <View style={s.row}>
         <TextInput
           style={[s.input, { flex: 1 }]}

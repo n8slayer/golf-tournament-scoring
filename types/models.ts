@@ -63,10 +63,23 @@ export interface Score {
   strokes: number;
 }
 
+export type EventType = 'rydercup' | 'strokeplay' | 'stableford';
+
+export interface EventSettings {
+  type: EventType;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string;
+  skinValue: number; // defaults for new rounds
+  matchStake: number;
+}
+
 export interface Trip {
   id: string;
   name: string;
   createdAt: string;
+  event?: EventSettings; // missing on trips made before event setup
+  // Set once the event is shared (stored in Supabase). Missing = only on this device.
+  sync?: { inviteCode: string; organizerId: string; myPlayerId?: string };
   players: Player[];
   teams: Team[]; // 0 or 2 entries
   courses: Course[]; // at least one

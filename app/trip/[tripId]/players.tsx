@@ -1,34 +1,16 @@
-import { useState } from 'react';
-import { View, Text, TextInput, Pressable, FlatList } from 'react-native';
+import { View, Text, Pressable, FlatList } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTrips } from '../../../context/TripsContext';
+import { PlayerForm } from '../../../components/PlayerForm';
 import { s, colors } from '../../../lib/styles';
-import { courseHandicap, parseHandicapIndex, formatHandicap, MAX_INDEX, MAX_PLUS } from '../../../lib/handicap';
+import { courseHandicap, formatHandicap } from '../../../lib/handicap';
 
 export default function Players() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, addPlayer, removePlayer } = useTrips();
+  const { getTrip, addPlayer, removePlayer, isOrganizer } = useTrips();
   const trip = getTrip(tripId);
-  const [name, setName] = useState('');
-  const [hcp, setHcp] = useState('');
-  const [plus, setPlus] = useState(false);
-  const [error, setError] = useState('');
-
   if (!trip) return null;
-
-  const submit = () => {
-    if (!name.trim()) return setError('Enter a name.');
-    // The toggle and a typed "+" both mean plus handicap.
-    const typedPlus = hcp.trim().startsWith('+');
-    const handicapIndex = parseHandicapIndex((plus || typedPlus ? '+' : '') + hcp.trim().replace(/^\+/, ''));
-    if (handicapIndex === null)
-      return setError(`Handicap index must be between +${MAX_PLUS} and ${MAX_INDEX}, e.g. 12.4 or +5.4.`);
-    addPlayer(tripId, name.trim(), handicapIndex);
-    setName('');
-    setHcp('');
-    setPlus(false);
-    setError('');
-  };
+  const canEdit = isOrganizer(trip);
 
   return (
     <View style={s.screen}>
@@ -37,38 +19,11 @@ export default function Players() {
         data={trip.players}
         keyExtractor={(p) => p.id}
         ListHeaderComponent={
-          <View style={{ gap: 8 }}>
-            <Text style={s.label}>Name</Text>
-            <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Player name" accessibilityLabel="Player name" />
-            <Text style={s.label}>Handicap index</Text>
-            <View style={s.row}>
-              <Pressable
-                onPress={() => setPlus((v) => !v)}
-                accessibilityRole="switch"
-                accessibilityLabel="Plus handicap"
-                accessibilityState={{ checked: plus }}
-                style={[s.pill, { minHeight: 48 }, plus && s.pillActive]}
-              >
-                <Text style={plus ? s.pillTextActive : s.pillText}>+ Plus</Text>
-              </Pressable>
-              <TextInput
-                style={[s.input, { flex: 1 }]}
-                value={hcp}
-                onChangeText={(v) => {
-                  setHcp(v);
-                  setError('');
-                }}
-                placeholder={plus ? 'e.g. 5.4 (plays as +5.4)' : 'e.g. 12.4'}
-                accessibilityLabel="Handicap index"
-                keyboardType="decimal-pad"
-              />
-            </View>
-            <Text style={s.subtitle}>Up to {MAX_INDEX}. Tap “+ Plus” for a plus handicap.</Text>
-            {!!error && <Text style={{ color: colors.danger }}>{error}</Text>}
-            <Pressable style={s.button} onPress={submit} accessibilityRole="button">
-              <Text style={s.buttonText}>Add player</Text>
-            </Pressable>
-          </View>
+          canEdit ? (
+            <PlayerForm onAdd={(name, index) => addPlayer(tripId, name, index)} />
+          ) : (
+            <Text style={s.subtitle}>Only the organizer can change the roster.</Text>
+          )
         }
         ListEmptyComponent={<Text style={s.subtitle}>No players yet.</Text>}
         renderItem={({ item }) => (
@@ -83,6 +38,7 @@ export default function Players() {
                   .join('')}
               </Text>
             </View>
+            {canEdit && (
             <Pressable
               onPress={() => removePlayer(tripId, item.id)}
               accessibilityRole="button"
@@ -91,6 +47,7 @@ export default function Players() {
             >
               <Text style={{ color: colors.danger, fontWeight: '600' }}>Remove</Text>
             </Pressable>
+            )}
           </View>
         )}
       />

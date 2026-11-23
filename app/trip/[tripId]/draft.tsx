@@ -7,14 +7,22 @@ import { formatHandicap } from '../../../lib/handicap';
 
 export default function Draft() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, ensureTeams, assignPlayerToTeam, renameTeam } = useTrips();
+  const { getTrip, ensureTeams, assignPlayerToTeam, renameTeam, isOrganizer } = useTrips();
   const trip = getTrip(tripId);
 
   useEffect(() => {
     if (trip && trip.teams.length !== 2) ensureTeams(tripId);
   }, [tripId, trip?.teams.length]);
 
-  if (!trip || trip.teams.length !== 2) return null;
+  if (!trip) return null;
+  const canEdit = isOrganizer(trip);
+  if (trip.teams.length !== 2) {
+    return canEdit ? null : (
+      <View style={[s.screen, s.content]}>
+        <Text style={s.subtitle}>The organizer hasn't set up teams yet.</Text>
+      </View>
+    );
+  }
 
   const [teamA, teamB] = trip.teams;
   const undrafted = trip.players.filter((p) => !p.teamId);
@@ -22,9 +30,9 @@ export default function Draft() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
-      <Text style={s.label}>UNDRAFTED</Text>
-      {undrafted.length === 0 && <Text style={s.subtitle}>Everyone is drafted.</Text>}
-      {undrafted.map((p) => (
+      {canEdit && <Text style={s.label}>UNDRAFTED</Text>}
+      {canEdit && undrafted.length === 0 && <Text style={s.subtitle}>Everyone is drafted.</Text>}
+      {canEdit && undrafted.map((p) => (
         <View key={p.id} style={[s.card, s.row]}>
           <Text style={s.title}>{p.name}</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -48,6 +56,7 @@ export default function Draft() {
             style={[s.input, { borderColor: color, borderWidth: 2, fontWeight: '700' }]}
             value={team.name}
             onChangeText={(v) => renameTeam(tripId, team.id, v)}
+            editable={canEdit}
             placeholder="Team name"
             accessibilityLabel={`Name for ${team.name || 'team'}`}
             maxLength={24}

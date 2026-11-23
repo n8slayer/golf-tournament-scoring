@@ -7,7 +7,8 @@ export default function RootLayout() {
     <TripsProvider>
       <Stack screenOptions={headerOptions}>
         <Stack.Screen name="index" options={{ title: 'Golf Trips' }} />
-        <Stack.Screen name="trip/new" options={{ title: 'New Trip' }} />
+        <Stack.Screen name="trip/new" options={{ title: 'New Event' }} />
+        <Stack.Screen name="join/[code]" options={{ title: 'Join event' }} />
         <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
       </Stack>
     </TripsProvider>

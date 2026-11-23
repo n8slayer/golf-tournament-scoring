@@ -1,9 +1,15 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Hole, NewCourse } from '../types/models';
+import { FIXTURE_COURSES } from './courseFixtures';
 
 // GolfCourseAPI (golfcourseapi.com). Free tier: 35 requests/day.
 // shortcut: key is inlined into the public web bundle, so anyone can use up the quota; move behind an EAS API route if that happens.
 const BASE = 'https://api.golfcourseapi.com/v1';
 const KEY = process.env.EXPO_PUBLIC_GOLF_COURSE_API_KEY;
+// Test mode: sample courses, no API requests. Set EXPO_PUBLIC_COURSE_API_MOCK=1 in .env.local.
+export const COURSE_API_MOCK = process.env.EXPO_PUBLIC_COURSE_API_MOCK === '1';
+const CACHE_PREFIX = 'golfcourseapi:v1:';
+const CACHE_DAYS = 30;
 
 export interface CourseSummary {
   id: string;
@@ -25,21 +31,45 @@ export interface CourseDetail extends CourseSummary {
   tees: { male?: TeeBox[]; female?: TeeBox[] };
 }
 
+// Successful lookups are cached on the device so repeat searches/picks cost no requests.
 async function get<T>(path: string): Promise<T> {
+  const cacheKey = CACHE_PREFIX + path.toLowerCase();
+  try {
+    const hit = await AsyncStorage.getItem(cacheKey);
+    if (hit) {
+      const { at, data } = JSON.parse(hit);
+      if (Date.now() - at < CACHE_DAYS * 86400000) return data as T;
+    }
+  } catch {
+    // cache unavailable (private window etc.): fall through to the network
+  }
   if (!KEY) throw new Error('Missing EXPO_PUBLIC_GOLF_COURSE_API_KEY in .env.local');
   const res = await fetch(BASE + path, { headers: { Authorization: `Bearer ${KEY}` } });
   if (res.status === 429) throw new Error('Daily course lookup limit reached. Try again tomorrow.');
   if (!res.ok) throw new Error(`Course lookup failed (${res.status})`);
-  return res.json();
+  const data = await res.json();
+  try {
+    await AsyncStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), data }));
+  } catch {
+    // ignore: caching is best-effort
+  }
+  return data as T;
 }
 
 export async function searchCourses(query: string): Promise<CourseSummary[]> {
+  if (COURSE_API_MOCK) {
+    const q = query.trim().toLowerCase();
+    const hits = FIXTURE_COURSES.filter((c) => `${c.club_name} ${c.course_name}`.toLowerCase().includes(q));
+    return hits.length ? hits : FIXTURE_COURSES; // any search shows the samples
+  }
   const data = await get<{ courses?: CourseSummary[] }>(`/search?search_query=${encodeURIComponent(query)}`);
   return data.courses ?? [];
 }
 
 // The live API wraps the course as { course: {...} } (the published spec doesn't).
 export async function getCourse(id: string): Promise<CourseDetail> {
+  const fixture = FIXTURE_COURSES.find((c) => c.id === id);
+  if (COURSE_API_MOCK && fixture) return fixture;
   const data = await get<{ course?: CourseDetail } & Partial<CourseDetail>>(`/courses/${encodeURIComponent(id)}`);
   const course = (data.course ?? data) as CourseDetail;
   return { ...course, tees: course.tees ?? {} };

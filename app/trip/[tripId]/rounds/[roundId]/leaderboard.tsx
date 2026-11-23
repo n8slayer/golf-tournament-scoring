@@ -3,7 +3,7 @@ import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../../context/TripsContext';
-import { leaderboard, computeSettlement, courseFor, skinsForRound, matchPairings, matchStatus } from '../../../../../lib/scoring';
+import { leaderboard, computeSettlement, courseFor, skinsForRound, matchPairings, matchStatus, eventOf } from '../../../../../lib/scoring';
 import { holeNumbersFor } from '../../../../../lib/holeRanges';
 import { PressableLink } from '../../../../../components/NavCard';
 import { Scorecard } from '../../../../../components/Scorecard';
@@ -23,9 +23,12 @@ export default function Leaderboard() {
   const course = courseFor(trip, round);
   const holes = course.holes.filter((h) => holeNumbers.includes(h.number));
   const rows = leaderboard(trip, round);
+  const stableford = eventOf(trip).type === 'stableford';
   const nameOf = (id: string) => trip.players.find((p) => p.id === id)?.name ?? 'Unknown';
   const roundDone = rows.length > 0 && rows.every((r) => r.thru === holeNumbers.length);
-  const winners = roundDone ? rows.filter((r) => r.net === rows[0].net) : [];
+  const winners = roundDone
+    ? rows.filter((r) => (stableford ? r.points === rows[0].points : r.net === rows[0].net))
+    : [];
   const payments = roundDone ? computeSettlement(trip, [round]) : [];
   const hasMoney = round.skinsEnabled || round.matchEnabled;
   // Why the money moved: skins won per player and each match result.
@@ -65,7 +68,7 @@ export default function Leaderboard() {
             <Text style={st.bannerLabel}>{winners.length > 1 ? 'TIED FOR THE WIN' : 'WINNER'}</Text>
             <Text style={st.bannerName}>{winners.map((w) => w.playerName).join(' & ')}</Text>
             <Text style={st.bannerMeta}>
-              Net {winners[0].net} ({toParText(winners[0].netToPar)}) · {round.name}
+              {stableford ? `${winners[0].points} pts` : `Net ${winners[0].net} (${toParText(winners[0].netToPar)})`} · {round.name}
             </Text>
           </View>
         </View>
@@ -94,7 +97,8 @@ export default function Leaderboard() {
       )}
 
       <Text style={s.subtitle}>
-        {roundDone ? 'Final results, ranked by net score.' : 'Ranked by net score. Thru = holes entered.'} Tap a
+        {roundDone ? 'Final results, ranked by' : 'Ranked by'} {stableford ? 'Stableford points' : 'net score'}.
+        {roundDone ? '' : ' Thru = holes entered.'} Tap a
         player for their scorecard.
       </Text>
     </View>
@@ -121,7 +125,7 @@ export default function Leaderboard() {
           ) : undefined
         }
         renderItem={({ item, index }) => {
-          const leader = item.thru > 0 && item.net === rows[0].net;
+          const leader = item.thru > 0 && (stableford ? item.points === rows[0].points : item.net === rows[0].net);
           const expanded = open.includes(item.playerId);
           return (
             <View style={[s.card, leader && { borderColor: colors.accent, borderWidth: 2 }]}>
@@ -144,8 +148,10 @@ export default function Leaderboard() {
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={s.label}>Net</Text>
-                  <Text style={{ fontSize: 26, fontWeight: '800', color: colors.primary }}>{item.net}</Text>
+                  <Text style={s.label}>{stableford ? 'Pts' : 'Net'}</Text>
+                  <Text style={{ fontSize: 26, fontWeight: '800', color: colors.primary }}>
+                    {stableford ? item.points : item.net}
+                  </Text>
                 </View>
                 <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={icon.sm} color={colors.muted} />
               </Pressable>

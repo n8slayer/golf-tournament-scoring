@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, Switch, ScrollView } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTrips } from '../../../../context/TripsContext';
 import { HolesPlayed, MatchFormat } from '../../../../types/models';
-import { defaultPairings } from '../../../../lib/scoring';
+import { defaultPairings, eventOf } from '../../../../lib/scoring';
 import { MatchBuilder, Slots, isComplete } from '../../../../components/MatchBuilder';
 import { s } from '../../../../lib/styles';
 
@@ -15,22 +15,30 @@ const HOLE_OPTIONS: { value: HolesPlayed; label: string }[] = [
 
 export default function NewRound() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, createRound } = useTrips();
+  const { getTrip, createRound, isOrganizer } = useTrips();
   const trip = getTrip(tripId);
   const router = useRouter();
 
-  const [name, setName] = useState('Round 1');
+  const event = trip ? eventOf(trip) : undefined;
+  const [name, setName] = useState(`Round ${(trip?.rounds.length ?? 0) + 1}`);
   const [holesPlayed, setHolesPlayed] = useState<HolesPlayed>('18');
   const [courseId, setCourseId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>(trip?.players.map((p) => p.id) ?? []);
   const [skinsEnabled, setSkinsEnabled] = useState(true);
-  const [skinValue, setSkinValue] = useState('5');
-  const [matchEnabled, setMatchEnabled] = useState(true);
-  const [matchStake, setMatchStake] = useState('20');
+  const [skinValue, setSkinValue] = useState(String(event?.skinValue ?? 5));
+  const [matchEnabled, setMatchEnabled] = useState(event ? event.type === 'rydercup' : true);
+  const [matchStake, setMatchStake] = useState(String(event?.matchStake ?? 20));
   const [format, setFormat] = useState<MatchFormat>('singles');
   const [slots, setSlots] = useState<Slots[] | null>(null); // null = draft-order defaults
 
   if (!trip) return null;
+  if (!isOrganizer(trip)) {
+    return (
+      <View style={[s.screen, s.content]}>
+        <Text style={s.subtitle}>Only the organizer can start new rounds.</Text>
+      </View>
+    );
+  }
   const chosenCourseId = courseId ?? trip.courses[0]?.id;
 
   const toggleSelected = (id: string) => {

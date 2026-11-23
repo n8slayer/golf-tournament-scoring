@@ -1,4 +1,4 @@
-import { Trip, Round, Player, Score, Course, MatchFormat } from '../types/models';
+import { Trip, Round, Player, Score, Course, MatchFormat, EventSettings } from '../types/models';
 import { strokesReceivedOnHole, courseHandicap } from './handicap';
 import { holeNumbersFor } from './holeRanges';
 
@@ -34,6 +34,16 @@ export function allowanceFor(round: Round): number {
   return formatOf(round) === 'fourball' ? 0.9 : 1;
 }
 
+// Older trips have no event settings: teams mean Ryder Cup, otherwise stroke play.
+export function eventOf(trip: Trip): EventSettings {
+  return trip.event ?? { type: trip.teams.length === 2 ? 'rydercup' : 'strokeplay', skinValue: 5, matchStake: 20 };
+}
+
+// Stableford: 2 for net par, +1 per stroke better, 0 for net double bogey or worse.
+export function stablefordPoints(net: number, par: number): number {
+  return Math.max(0, 2 + par - net);
+}
+
 function roundScoresFor(trip: Trip, roundId: string): Score[] {
   return trip.scores.filter((s) => s.roundId === roundId);
 }
@@ -47,6 +57,7 @@ export interface LeaderboardRow {
   gross: number;
   net: number;
   netToPar: number; // over holes played so far
+  points: number; // Stableford points so far
 }
 
 export function leaderboard(trip: Trip, round: Round): LeaderboardRow[] {
@@ -59,17 +70,24 @@ export function leaderboard(trip: Trip, round: Round): LeaderboardRow[] {
     let net = 0;
     let thru = 0;
     let par = 0;
+    let points = 0;
     for (const holeNumber of holes) {
       const s = getScore(scores, playerId, holeNumber);
       if (!s || !player) continue;
+      const holeNet = netStrokes(course, player, holeNumber, s.strokes);
+      const holePar = getHole(course, holeNumber)?.par ?? 0;
       gross += s.strokes;
-      net += netStrokes(course, player, holeNumber, s.strokes);
+      net += holeNet;
       thru += 1;
-      par += getHole(course, holeNumber)?.par ?? 0;
+      par += holePar;
+      points += stablefordPoints(holeNet, holePar);
     }
-    return { playerId, playerName: player?.name ?? 'Unknown', thru, gross, net, netToPar: net - par };
+    return { playerId, playerName: player?.name ?? 'Unknown', thru, gross, net, netToPar: net - par, points };
   });
-  return rows.sort((a, b) => (a.thru === 0 && b.thru === 0 ? 0 : a.net - b.net));
+  const stableford = eventOf(trip).type === 'stableford';
+  return rows.sort((a, b) =>
+    a.thru === 0 && b.thru === 0 ? 0 : stableford ? b.points - a.points : a.net - b.net
+  );
 }
 
 // ---------- Match play (singles or four-ball; sideA = team A, sideB = team B) ----------
@@ -265,6 +283,40 @@ export function computeSettlement(trip: Trip, rounds: Round[] = trip.rounds): Se
   return lines;
 }
 
+// ---------- Trip standings (stroke play / Stableford across all rounds) ----------
+
+export interface StandingRow {
+  playerId: string;
+  playerName: string;
+  rounds: number; // rounds with at least one hole scored
+  holes: number;
+  gross: number;
+  netToPar: number;
+  points: number;
+}
+
+export function tripStandings(trip: Trip): StandingRow[] {
+  const rows = new Map<string, StandingRow>(
+    trip.players.map((p) => [p.id, { playerId: p.id, playerName: p.name, rounds: 0, holes: 0, gross: 0, netToPar: 0, points: 0 }])
+  );
+  for (const round of trip.rounds) {
+    for (const r of leaderboard(trip, round)) {
+      const row = rows.get(r.playerId);
+      if (!row || r.thru === 0) continue;
+      row.rounds += 1;
+      row.holes += r.thru;
+      row.gross += r.gross;
+      row.netToPar += r.netToPar;
+      row.points += r.points;
+    }
+  }
+  const stableford = eventOf(trip).type === 'stableford';
+  return [...rows.values()].sort((a, b) => {
+    if (!a.holes || !b.holes) return b.holes - a.holes; // players with no scores go last
+    return stableford ? b.points - a.points : a.netToPar - b.netToPar;
+  });
+}
+
 // ---------- Team points (Ryder Cup style: win 1, halve ½, in progress 0) ----------
 
 export interface TeamPoints {
@@ -383,6 +435,25 @@ function selfCheck() {
   console.assert(fbLines.length === 2 && fbLines.every((l) => l.amount === 20), 'fourball settlement: both losers pay $20');
   const lastHole = matchStatus({ ...trip, scores: [...trip.scores, ...extra] }, fb18, fb18.matches![0]);
   console.assert(lastHole.resultLabel === '1 up' && !lastHole.closedOut && lastHole.through === 18, 'match: won on 18 reads "1 up", not "1&0"');
+
+  // Stableford: net birdie 3, par 2, bogey 1, double 0 (never negative).
+  console.assert(
+    [stablefordPoints(3, 4), stablefordPoints(4, 4), stablefordPoints(5, 4), stablefordPoints(6, 4), stablefordPoints(9, 4)].join() === '3,2,1,0,0',
+    'stableford: points per hole'
+  );
+  // Standings across two rounds: second round copies the first with Alice making 5s.
+  const r2: Round = { ...trip.rounds[0], id: 'r2' };
+  const two: Trip = {
+    ...trip,
+    rounds: [trip.rounds[0], r2],
+    scores: [...trip.scores, { roundId: 'r2', playerId: 'p1', holeNumber: 1, strokes: 5 }],
+  };
+  const st = tripStandings(two);
+  const aliceRow = st.find((r) => r.playerId === 'p1')!;
+  console.assert(aliceRow.rounds === 2 && aliceRow.gross === 8 && aliceRow.netToPar === 0, 'standings: 3 + 5 on par 4s = E over 2 rounds');
+  console.assert(st[0].playerId === 'p1', 'standings: stroke play leader has lowest net to par');
+  const stb = tripStandings({ ...two, event: { type: 'stableford', skinValue: 0, matchStake: 0 } });
+  console.assert(stb[0].points >= stb[1].points, 'standings: stableford sorts by points');
 
   const settlement = computeSettlement(trip);
   const net = settlement.reduce((sum, l) => sum + l.amount, 0) - settlement.reduce((sum, l) => sum + l.amount, 0);

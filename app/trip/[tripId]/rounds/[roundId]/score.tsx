@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../../context/TripsContext';
 import { holeNumbersFor } from '../../../../../lib/holeRanges';
 import { strokesReceivedOnHole, courseHandicap, formatHandicap } from '../../../../../lib/handicap';
-import { leaderboard, matchPairings, matchStatus, courseFor } from '../../../../../lib/scoring';
+import { leaderboard, matchPairings, matchStatus, courseFor, eventOf } from '../../../../../lib/scoring';
 import { PressableLink } from '../../../../../components/NavCard';
 import { s, colors, icon } from '../../../../../lib/styles';
 import { Trip, Round } from '../../../../../types/models';
@@ -110,7 +110,7 @@ export default function Score() {
               {standings.map((r, i) => (
                 <View key={r.playerId} style={[hb.standing, i === 0 && hb.standingLead]}>
                   <Text style={[hb.standingText, i === 0 && { color: colors.primary }]} numberOfLines={1}>
-                    {i + 1}. {r.playerName} {toParText(r.netToPar)}
+                    {i + 1}. {r.playerName} {eventOf(trip).type === 'stableford' ? `${r.points} pts` : toParText(r.netToPar)}
                     <Text style={{ fontWeight: '500' }}> · thru {r.thru}</Text>
                   </Text>
                 </View>
