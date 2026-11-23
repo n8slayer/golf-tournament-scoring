@@ -10,7 +10,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Email → 6-digit code → (first time) your name. No passwords.
 export default function SignIn() {
   const { next } = useLocalSearchParams<{ next?: string }>();
-  const { user, displayName, hasAnonymousSession, sendCode, verifyCode, setDisplayName } = useAuth();
+  const { user, displayName, hasAnonymousSession, sendCode, verifyCode, setDisplayName, createTestUser } = useAuth();
   const [step, setStep] = useState<'email' | 'code' | 'name'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -104,6 +104,22 @@ export default function SignIn() {
           <Pressable style={({ pressed }) => [s.button, busy && s.disabled, pressed && s.pressed]} onPress={submitEmail} disabled={busy} accessibilityRole="button">
             <Text style={s.buttonText}>Email me a sign-in link</Text>
           </Pressable>
+          {process.env.EXPO_PUBLIC_TEST_LOGIN === '1' && (
+            <View style={{ gap: 6, marginTop: 12 }}>
+              <Pressable
+                onPress={() => run(createTestUser)}
+                disabled={busy}
+                accessibilityRole="button"
+                style={({ pressed }) => [s.buttonSecondary, { borderStyle: 'dashed' }, busy && s.disabled, pressed && s.pressed]}
+              >
+                <Ionicons name="flask-outline" size={icon.sm} color={colors.accent} />
+                <Text style={s.buttonTextSecondary}>Create test user (staging only)</Text>
+              </Pressable>
+              <Text style={[s.subtitle, { fontSize: 13, textAlign: 'center' }]}>
+                Makes a brand-new account instantly, with no email. Sign out to make another.
+              </Text>
+            </View>
+          )}
         </>
       )}
 

@@ -21,6 +21,7 @@ interface AuthValue {
   verifyCode: (email: string, code: string) => Promise<void>;
   setDisplayName: (name: string) => Promise<void>;
   signOut: () => Promise<void>;
+  createTestUser: () => Promise<void>; // staging only (EXPO_PUBLIC_TEST_LOGIN)
 }
 
 const AuthContext = createContext<AuthValue | undefined>(undefined);
@@ -103,6 +104,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setName(name.trim());
   };
 
+  // Staging: a fresh real account with no email sent. Needs "Confirm email" off in Supabase.
+  // example.com is reserved, so these addresses never belong to a real person.
+  const createTestUser = async () => {
+    const rand = Math.random().toString(36).slice(2, 10);
+    const { data, error } = await db().auth.signUp({
+      email: `golf-test-${rand}@example.com`,
+      password: `t-${rand}-${Math.random().toString(36).slice(2)}`,
+    });
+    if (error) throw error;
+    if (!data.session) throw new Error('Supabase still requires email confirmation: turn off "Confirm email" in Authentication → Email.');
+  };
+
   const signOut = async () => {
     await db().auth.signOut();
   };
@@ -120,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verifyCode,
         setDisplayName,
         signOut,
+        createTestUser,
       }}
     >
       {children}
