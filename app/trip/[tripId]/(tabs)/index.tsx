@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../context/TripsContext';
 import { PressableLink } from '../../../../components/NavCard';
 import { TeamScoreHeader } from '../../../../components/MatchBoard';
+import { CourseHero } from '../../../../components/CourseHero';
 import { joinLink } from '../../../../components/ShareCard';
 import { playerSlots, PlayerSlot } from '../../../../lib/sync';
 import {
@@ -246,18 +247,22 @@ export default function EventHome() {
   const leader = event.type !== 'rydercup' ? tripStandings(trip).find((r) => r.holes > 0) : undefined;
   const needsPlayer = !editor && trip.sync && !trip.sync.myPlayerId;
   const dates = [event.startDate, event.endDate].filter(Boolean).join(' – ');
+  // Photo of the course being played now (or next), else the first course.
+  const heroRound = trip.rounds.find((r) => roundState(trip, r) === 'live') ?? trip.rounds.find((r) => roundState(trip, r) === 'upcoming');
+  const heroCourse = heroRound ? courseFor(trip, heroRound) : trip.courses[0];
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
-      <View style={{ gap: 4 }}>
+      <CourseHero courseName={heroCourse?.name} height={180}>
         <Text style={st.kicker}>
           {FORMAT_NAME[event.type].toUpperCase()}
           {dates ? ` · ${dates}` : ''}
         </Text>
-        <Text style={[s.h1, { fontSize: 30 }]} accessibilityRole="header">
+        <Text style={[s.h1, st.onPhoto, { fontSize: 30 }]} accessibilityRole="header">
           {trip.name}
         </Text>
-      </View>
+        {heroCourse && <Text style={[st.onPhoto, { color: colors.text, fontWeight: '600' }]}>{heroCourse.name}</Text>}
+      </CourseHero>
       <CodePill trip={trip} />
 
       {(offline || pending > 0) && (
@@ -320,6 +325,7 @@ export default function EventHome() {
 
 const st = StyleSheet.create({
   kicker: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  onPhoto: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 8, textShadowOffset: { width: 0, height: 1 } },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',

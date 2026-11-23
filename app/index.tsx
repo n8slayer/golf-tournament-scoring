@@ -6,6 +6,7 @@ import { useTrips } from '../context/TripsContext';
 import { useAuth } from '../context/AuthContext';
 import { PressableLink } from '../components/NavCard';
 import { JoinCodeCard } from '../components/JoinCodeCard';
+import { CourseHero } from '../components/CourseHero';
 import { getLastTripId } from '../lib/storage';
 import { s, colors, icon } from '../lib/styles';
 
@@ -31,29 +32,21 @@ export default function Landing() {
   }
 
   if (trips.length) {
-    const target =
-      trips.find((t) => t.id === lastId) ?? [...trips].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0];
+    const target = trips.find((t) => t.id === lastId) ?? [...trips].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0];
     return <Redirect href={`/trip/${target.id}`} />;
   }
 
   return (
-    <ScrollView
-      style={s.screen}
-      contentContainerStyle={[s.content, { paddingTop: 40, gap: 16 }]}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={{ alignItems: 'center', gap: 8 }}>
-        <View style={[s.iconBadge, { width: 72, height: 72, borderRadius: 36 }]}>
-          <Ionicons name="golf" size={36} color={colors.accent} />
-        </View>
-        <Text style={st.kicker}>GOLF TRIP</Text>
-        <Text style={[s.h1, { textAlign: 'center' }]} accessibilityRole="header">
-          {displayName ? `Welcome, ${displayName}` : 'Welcome'}
+    <ScrollView style={s.screen} contentContainerStyle={[s.content, { paddingTop: 24, gap: 16 }]} keyboardShouldPersistTaps="handled">
+      <CourseHero height={300}>
+        <Text style={st.kicker}>{displayName ? `WELCOME, ${displayName.toUpperCase()}` : 'GOLF TRIP SCORING'}</Text>
+        <Text style={[s.h1, st.onPhoto]} accessibilityRole="header">
+          Live scoring for your golf trip
         </Text>
-        <Text style={[s.subtitle, { textAlign: 'center' }]}>
-          Live scores, team matches, skins and who owes who, for your whole group.
+        <Text style={[s.subtitle, st.onPhoto, { color: colors.text }]}>
+          Ryder Cup matches, stroke play or Stableford. Net scores, skins and who owes who, on every phone as you play.
         </Text>
-      </View>
+      </CourseHero>
 
       <JoinCodeCard />
 
@@ -79,4 +72,5 @@ export default function Landing() {
 
 const st = StyleSheet.create({
   kicker: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+  onPhoto: { textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 8, textShadowOffset: { width: 0, height: 1 } },
 });

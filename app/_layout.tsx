@@ -6,6 +6,7 @@ import { headerOptions, s, colors } from '../lib/styles';
 import { TripsProvider } from '../context/TripsContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { UpdateBanner } from '../components/UpdateBanner';
+import '../lib/webInteractions';
 
 // Everyone signs in (email code) before using shared events; the page they were going to
 // (e.g. an invite link) is passed as ?next= so they land there afterwards.

@@ -53,7 +53,7 @@ export const s = StyleSheet.create({
     borderColor: colors.border,
     gap: 6,
   },
-  pressed: { opacity: 0.7 },
+  pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   input: {
     borderWidth: 1,
