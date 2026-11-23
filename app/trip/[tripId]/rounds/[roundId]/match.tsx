@@ -1,7 +1,8 @@
-import { View, Text, FlatList } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTrips } from '../../../../../context/TripsContext';
-import { matchPairings, matchStatus } from '../../../../../lib/scoring';
+import { matchPairings } from '../../../../../lib/scoring';
+import { MatchCard, SessionHeader } from '../../../../../components/MatchBoard';
 import { s } from '../../../../../lib/styles';
 
 export default function MatchPlay() {
@@ -12,35 +13,20 @@ export default function MatchPlay() {
   if (!trip || !round) return null;
 
   const pairings = matchPairings(trip, round);
-  const nameOf = (id: string) => trip.players.find((p) => p.id === id)?.name ?? 'Unknown';
 
   return (
-    <View style={s.screen}>
-      <FlatList
-        contentContainerStyle={s.content}
-        data={pairings}
-        keyExtractor={(p) => `${p.playerAId}-${p.playerBId}`}
-        ListHeaderComponent={
-          trip.teams.length !== 2 ? (
-            <Text style={s.subtitle}>Run the Team Draft first to create singles pairings.</Text>
-          ) : undefined
-        }
-        renderItem={({ item }) => {
-          const status = matchStatus(trip, round, item);
-          return (
-            <View style={s.card}>
-              <Text style={s.title}>
-                {nameOf(item.playerAId)} vs {nameOf(item.playerBId)}
-              </Text>
-              <Text style={s.subtitle}>
-                {status.holesUp === 0
-                  ? status.resultLabel
-                  : `${nameOf(status.holesUp > 0 ? item.playerAId : item.playerBId)} ${status.resultLabel}`}
-              </Text>
-            </View>
-          );
-        }}
-      />
-    </View>
+    <ScrollView style={s.screen} contentContainerStyle={s.content}>
+      {trip.teams.length !== 2 ? (
+        <Text style={s.subtitle}>Run the Team Draft first to create pairings.</Text>
+      ) : (
+        <View style={{ gap: 8 }}>
+          <SessionHeader trip={trip} round={round} />
+          {pairings.length === 0 && <Text style={s.subtitle}>No matches in this round.</Text>}
+          {pairings.map((pairing, i) => (
+            <MatchCard key={i} trip={trip} round={round} pairing={pairing} />
+          ))}
+        </View>
+      )}
+    </ScrollView>
   );
 }

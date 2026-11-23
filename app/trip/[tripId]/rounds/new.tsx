@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { View, Text, TextInput, Pressable, Switch, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTrips } from '../../../../context/TripsContext';
-import { HolesPlayed } from '../../../../types/models';
+import { HolesPlayed, MatchFormat } from '../../../../types/models';
+import { defaultPairings } from '../../../../lib/scoring';
+import { MatchBuilder, Slots, isComplete } from '../../../../components/MatchBuilder';
 import { s } from '../../../../lib/styles';
 
 const HOLE_OPTIONS: { value: HolesPlayed; label: string }[] = [
@@ -25,15 +27,24 @@ export default function NewRound() {
   const [skinValue, setSkinValue] = useState('5');
   const [matchEnabled, setMatchEnabled] = useState(true);
   const [matchStake, setMatchStake] = useState('20');
+  const [format, setFormat] = useState<MatchFormat>('singles');
+  const [slots, setSlots] = useState<Slots[] | null>(null); // null = draft-order defaults
 
   if (!trip) return null;
   const chosenCourseId = courseId ?? trip.courses[0]?.id;
 
-  const toggleSelected = (id: string) =>
+  const toggleSelected = (id: string) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSlots(null); // roster changed: re-suggest pairings
+  };
+
+  const hasTeams = trip.teams.length === 2;
+  const matches: Slots[] = slots ?? defaultPairings(trip, selected, format);
+  const matchesOk = !matchEnabled || !hasTeams || isComplete(matches);
+  const canCreate = selected.length > 0 && !!name.trim() && matchesOk;
 
   const submit = () => {
-    if (!name.trim() || selected.length === 0 || !chosenCourseId) return;
+    if (!canCreate || !chosenCourseId) return;
     const id = createRound(tripId, {
       name: name.trim(),
       courseId: chosenCourseId,
@@ -44,6 +55,16 @@ export default function NewRound() {
       matchEnabled,
       matchStake: parseFloat(matchStake) || 0,
       playerIds: selected,
+      ...(matchEnabled && hasTeams
+        ? {
+            format,
+            matches: matches.map((m, i) => ({
+              id: `m${i + 1}`,
+              sideA: m.sideA as string[],
+              sideB: m.sideB as string[],
+            })),
+          }
+        : {}),
     });
     router.replace(`/trip/${tripId}/rounds/${id}`);
   };
@@ -113,16 +134,33 @@ export default function NewRound() {
         <Switch value={matchEnabled} onValueChange={setMatchEnabled} />
       </View>
       {matchEnabled && (
-        <View>
-          <Text style={s.label}>$ per match</Text>
-          <TextInput style={s.input} value={matchStake} onChangeText={setMatchStake} keyboardType="decimal-pad" />
+        <View style={{ gap: 12 }}>
+          <View>
+            <Text style={s.label}>$ per match (0 for points only)</Text>
+            <TextInput style={s.input} value={matchStake} onChangeText={setMatchStake} keyboardType="decimal-pad" />
+          </View>
+          {hasTeams ? (
+            <MatchBuilder
+              trip={trip}
+              playerIds={selected}
+              format={format}
+              onFormat={(f) => {
+                setFormat(f);
+                setSlots(null);
+              }}
+              matches={matches}
+              onChange={setSlots}
+            />
+          ) : (
+            <Text style={s.subtitle}>Run the Team Draft first to set up matches.</Text>
+          )}
         </View>
       )}
 
       <Pressable
-        style={[s.button, { marginTop: 12 }, (selected.length === 0 || !name.trim()) && s.disabled]}
+        style={[s.button, { marginTop: 12 }, !canCreate && s.disabled]}
         onPress={submit}
-        disabled={selected.length === 0 || !name.trim()}
+        disabled={!canCreate}
         accessibilityRole="button"
       >
         <Text style={s.buttonText}>Create round</Text>

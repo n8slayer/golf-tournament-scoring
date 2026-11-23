@@ -15,6 +15,7 @@ interface TripsContextValue {
   updatePlayer: (tripId: string, playerId: string, patch: Partial<Player>) => void;
   removePlayer: (tripId: string, playerId: string) => void;
   ensureTeams: (tripId: string) => void;
+  renameTeam: (tripId: string, teamId: string, name: string) => void;
   assignPlayerToTeam: (tripId: string, playerId: string, teamId: string) => void;
   updateHole: (
     tripId: string,
@@ -96,6 +97,10 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const renameTeam = (tripId: string, teamId: string, name: string) => {
+    updateTrip(tripId, (t) => ({ ...t, teams: t.teams.map((tm) => (tm.id === teamId ? { ...tm, name } : tm)) }));
+  };
+
   // Moves the player to the end of the roster so each team's filtered order
   // reflects draft-assignment order (used as the singles match "slot index").
   const assignPlayerToTeam = (tripId: string, playerId: string, teamId: string) => {
@@ -162,6 +167,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
         updatePlayer,
         removePlayer,
         ensureTeams,
+        renameTeam,
         assignPlayerToTeam,
         updateHole,
         addCourse,

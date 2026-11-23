@@ -14,6 +14,8 @@ export const colors = {
   under: '#B3261E', // under par: red, scorecard convention
   border: '#D6E0D9',
   sand: '#F4E9D0',
+  teamA: '#15803D', // white text 5.0:1
+  teamB: '#1E3A8A', // white text 10.4:1
 };
 
 export const icon = { sm: 18, md: 22, lg: 28 };

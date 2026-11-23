@@ -31,12 +31,23 @@ export type NewCourse = Omit<Course, 'id'>;
 
 export type HolesPlayed = 'front9' | 'back9' | '18';
 
+export type MatchFormat = 'singles' | 'fourball';
+
+// sideA = team A players, sideB = team B players (1 each for singles, 2 for four-ball).
+export interface Match {
+  id: string;
+  sideA: string[];
+  sideB: string[];
+}
+
 export interface Round {
   id: string;
   name: string;
   date: string; // ISO date
   courseId: string;
   holesPlayed: HolesPlayed;
+  format?: MatchFormat; // missing = singles (rounds made before formats existed)
+  matches?: Match[]; // missing = automatic draft-order singles
   skinsEnabled: boolean;
   skinValue: number;
   matchEnabled: boolean;

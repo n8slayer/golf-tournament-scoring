@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTrips } from '../../../context/TripsContext';
-import { s } from '../../../lib/styles';
+import { s, colors } from '../../../lib/styles';
 import { formatHandicap } from '../../../lib/handicap';
 
 export default function Draft() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, ensureTeams, assignPlayerToTeam } = useTrips();
+  const { getTrip, ensureTeams, assignPlayerToTeam, renameTeam } = useTrips();
   const trip = getTrip(tripId);
 
   useEffect(() => {
@@ -38,18 +38,26 @@ export default function Draft() {
         </View>
       ))}
 
-      <Text style={[s.label, { marginTop: 16 }]}>{teamA.name.toUpperCase()}</Text>
-      {rosterFor(teamA.id).map((p, i) => (
-        <Text key={p.id} style={s.subtitle}>
-          {i + 1}. {p.name} (HCP {formatHandicap(p.handicapIndex)})
-        </Text>
-      ))}
-
-      <Text style={[s.label, { marginTop: 16 }]}>{teamB.name.toUpperCase()}</Text>
-      {rosterFor(teamB.id).map((p, i) => (
-        <Text key={p.id} style={s.subtitle}>
-          {i + 1}. {p.name} (HCP {formatHandicap(p.handicapIndex)})
-        </Text>
+      {[
+        { team: teamA, color: colors.teamA },
+        { team: teamB, color: colors.teamB },
+      ].map(({ team, color }) => (
+        <View key={team.id} style={{ gap: 6, marginTop: 16 }}>
+          <Text style={s.label}>Team name</Text>
+          <TextInput
+            style={[s.input, { borderColor: color, borderWidth: 2, fontWeight: '700' }]}
+            value={team.name}
+            onChangeText={(v) => renameTeam(tripId, team.id, v)}
+            placeholder="Team name"
+            accessibilityLabel={`Name for ${team.name || 'team'}`}
+            maxLength={24}
+          />
+          {rosterFor(team.id).map((p, i) => (
+            <Text key={p.id} style={s.subtitle}>
+              {i + 1}. {p.name} (HCP {formatHandicap(p.handicapIndex)})
+            </Text>
+          ))}
+        </View>
       ))}
     </ScrollView>
   );

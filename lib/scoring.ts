@@ -1,4 +1,4 @@
-import { Trip, Round, Player, Score, Course } from '../types/models';
+import { Trip, Round, Player, Score, Course, MatchFormat } from '../types/models';
 import { strokesReceivedOnHole, courseHandicap } from './handicap';
 import { holeNumbersFor } from './holeRanges';
 
@@ -19,10 +19,19 @@ function getScore(scores: Score[], playerId: string, holeNumber: number): Score 
   return scores.find((s) => s.playerId === playerId && s.holeNumber === holeNumber);
 }
 
-function netStrokes(course: Course, player: Player, holeNumber: number, strokes: number): number {
+// allowance scales the course handicap (e.g. 0.9 for four-ball match play).
+function netStrokes(course: Course, player: Player, holeNumber: number, strokes: number, allowance = 1): number {
   const hole = getHole(course, holeNumber);
   if (!hole) return strokes;
-  return strokes - strokesReceivedOnHole(courseHandicap(player.handicapIndex, course), hole.strokeIndex);
+  const handicap = Math.round(courseHandicap(player.handicapIndex, course) * allowance);
+  return strokes - strokesReceivedOnHole(handicap, hole.strokeIndex);
+}
+
+export const formatOf = (round: Round): MatchFormat => round.format ?? 'singles';
+
+// WHS recommended match-play allowances: singles 100%, four-ball 90%.
+export function allowanceFor(round: Round): number {
+  return formatOf(round) === 'fourball' ? 0.9 : 1;
 }
 
 function roundScoresFor(trip: Trip, roundId: string): Score[] {
@@ -63,26 +72,31 @@ export function leaderboard(trip: Trip, round: Round): LeaderboardRow[] {
   return rows.sort((a, b) => (a.thru === 0 && b.thru === 0 ? 0 : a.net - b.net));
 }
 
-// ---------- Match play (singles pairings, Team A slot i vs Team B slot i) ----------
+// ---------- Match play (singles or four-ball; sideA = team A, sideB = team B) ----------
 
 export interface MatchPairing {
-  playerAId: string;
-  playerBId: string;
+  sideA: string[];
+  sideB: string[];
 }
 
-export function matchPairings(trip: Trip, round: Round): MatchPairing[] {
+// Draft-order default: singles A[i] v B[i]; four-ball (A[2i],A[2i+1]) v (B[2i],B[2i+1]).
+export function defaultPairings(trip: Trip, playerIds: string[], format: MatchFormat): MatchPairing[] {
   const [teamA, teamB] = trip.teams;
   if (!teamA || !teamB) return [];
-  const rosterFor = (teamId: string) =>
-    trip.players.filter((p) => p.teamId === teamId && round.playerIds.includes(p.id));
-  const a = rosterFor(teamA.id);
-  const b = rosterFor(teamB.id);
-  const count = Math.min(a.length, b.length);
-  const pairings: MatchPairing[] = [];
-  for (let i = 0; i < count; i++) {
-    pairings.push({ playerAId: a[i].id, playerBId: b[i].id });
-  }
-  return pairings;
+  const rosterFor = (teamId: string) => trip.players.filter((p) => p.teamId === teamId && playerIds.includes(p.id));
+  const a = rosterFor(teamA.id).map((p) => p.id);
+  const b = rosterFor(teamB.id).map((p) => p.id);
+  const size = format === 'fourball' ? 2 : 1;
+  const count = Math.floor(Math.min(a.length, b.length) / size);
+  return Array.from({ length: count }, (_, i) => ({
+    sideA: a.slice(i * size, i * size + size),
+    sideB: b.slice(i * size, i * size + size),
+  }));
+}
+
+// Picked pairings when the round has them; older rounds fall back to draft-order singles.
+export function matchPairings(trip: Trip, round: Round): MatchPairing[] {
+  return round.matches ?? defaultPairings(trip, round.playerIds, 'singles');
 }
 
 export interface MatchStatus {
@@ -97,26 +111,36 @@ export function matchStatus(trip: Trip, round: Round, pairing: MatchPairing): Ma
   const holes = holeNumbersFor(round.holesPlayed);
   const scores = roundScoresFor(trip, round.id);
   const course = courseFor(trip, round);
-  const playerA = getPlayer(trip, pairing.playerAId);
-  const playerB = getPlayer(trip, pairing.playerBId);
+  const allowance = allowanceFor(round);
+  // Best ball: a side's score on a hole is its lowest net (singles = the one player).
+  // The hole counts only once every player in the match has a score.
+  const sideNet = (ids: string[], holeNumber: number): number | null => {
+    let best: number | null = null;
+    for (const id of ids) {
+      const player = getPlayer(trip, id);
+      const sc = getScore(scores, id, holeNumber);
+      if (!player || !sc) return null;
+      const net = netStrokes(course, player, holeNumber, sc.strokes, allowance);
+      best = best === null ? net : Math.min(best, net);
+    }
+    return best;
+  };
   let holesUp = 0;
   let through = 0;
   let closedOut = false;
 
   for (let i = 0; i < holes.length; i++) {
     const holeNumber = holes[i];
-    const sa = getScore(scores, pairing.playerAId, holeNumber);
-    const sb = getScore(scores, pairing.playerBId, holeNumber);
-    if (!sa || !sb || !playerA || !playerB) break;
-
-    const netA = netStrokes(course, playerA, holeNumber, sa.strokes);
-    const netB = netStrokes(course, playerB, holeNumber, sb.strokes);
+    const netA = sideNet(pairing.sideA, holeNumber);
+    const netB = sideNet(pairing.sideB, holeNumber);
+    if (netA === null || netB === null) break;
     if (netA < netB) holesUp += 1;
     else if (netB < netA) holesUp -= 1;
     through += 1;
 
     const remaining = holes.length - through;
-    if (Math.abs(holesUp) > remaining) {
+    // Closed out early (e.g. 3&2); a match won on the last hole is "1 up", not "1&0".
+    if (remaining > 0 && Math.abs(holesUp) > remaining) {
       closedOut = true;
       break;
     }
@@ -207,10 +231,13 @@ export function computeSettlement(trip: Trip, rounds: Round[] = trip.rounds): Se
       for (const pairing of pairings) {
         const status = matchStatus(trip, round, pairing);
         if (!isMatchDecided(status, holes.length) || status.holesUp === 0) continue;
-        const winnerId = status.holesUp > 0 ? pairing.playerAId : pairing.playerBId;
-        const loserId = status.holesUp > 0 ? pairing.playerBId : pairing.playerAId;
-        add(winnerId, round.matchStake);
-        add(loserId, -round.matchStake);
+        // Each losing player pays the stake to their counterpart on the winning side.
+        const winners = status.holesUp > 0 ? pairing.sideA : pairing.sideB;
+        const losers = status.holesUp > 0 ? pairing.sideB : pairing.sideA;
+        losers.forEach((loserId, i) => {
+          add(winners[i] ?? winners[0], round.matchStake);
+          add(loserId, -round.matchStake);
+        });
       }
     }
   }
@@ -236,6 +263,41 @@ export function computeSettlement(trip: Trip, rounds: Round[] = trip.rounds): Se
     if (creditors[j].amt <= 0.01) j++;
   }
   return lines;
+}
+
+// ---------- Team points (Ryder Cup style: win 1, halve ½, in progress 0) ----------
+
+export interface TeamPoints {
+  a: number;
+  b: number;
+  totalAvailable: number; // one point per match created so far
+  toWin: number;
+}
+
+export function matchPoints(status: MatchStatus, totalHoles: number): { a: number; b: number } | null {
+  if (!isMatchDecided(status, totalHoles)) return null;
+  if (status.holesUp > 0) return { a: 1, b: 0 };
+  if (status.holesUp < 0) return { a: 0, b: 1 };
+  return { a: 0.5, b: 0.5 };
+}
+
+export function teamPoints(trip: Trip): TeamPoints {
+  let a = 0;
+  let b = 0;
+  let totalAvailable = 0;
+  for (const round of trip.rounds) {
+    if (!round.matchEnabled) continue;
+    const holes = holeNumbersFor(round.holesPlayed).length;
+    for (const pairing of matchPairings(trip, round)) {
+      totalAvailable += 1;
+      const pts = matchPoints(matchStatus(trip, round, pairing), holes);
+      if (pts) {
+        a += pts.a;
+        b += pts.b;
+      }
+    }
+  }
+  return { a, b, totalAvailable, toWin: totalAvailable / 2 + 0.5 };
 }
 
 // ---------- Self-check (money/scoring logic — verify with sample data) ----------
@@ -292,10 +354,35 @@ function selfCheck() {
 
   const pairings = matchPairings(trip, trip.rounds[0]);
   console.assert(pairings.length === 2, 'match: expect 2 singles pairings for 2v2');
-  console.assert(pairings[0].playerAId === 'p1' && pairings[0].playerBId === 'p2', 'match: slot 1 pairing');
+  console.assert(pairings[0].sideA[0] === 'p1' && pairings[0].sideB[0] === 'p2', 'match: slot 1 pairing (legacy fallback)');
 
   const status = matchStatus(trip, trip.rounds[0], pairings[0]);
   console.assert(status.holesUp === 1 && status.through === 1, 'match: Alice 1 up thru 1 (3 beats 5)');
+
+  // Four-ball: (Alice, Cara) v (Bob, Dee) on hole 1 -> best nets 3 v 4, team A 1 up.
+  const fb: Round = { ...trip.rounds[0], format: 'fourball', matches: [{ id: 'm1', sideA: ['p1', 'p3'], sideB: ['p2', 'p4'] }] };
+  const fbStatus = matchStatus(trip, fb, fb.matches![0]);
+  console.assert(fbStatus.holesUp === 1 && fbStatus.through === 1, 'fourball: best ball 3 beats 4');
+  console.assert(allowanceFor(fb) === 0.9 && allowanceFor(trip.rounds[0]) === 1, 'fourball: 90% allowance, singles 100%');
+  const dp = defaultPairings(trip, ['p1', 'p2', 'p3', 'p4'], 'fourball');
+  console.assert(dp.length === 1 && dp[0].sideA.join() === 'p1,p3' && dp[0].sideB.join() === 'p2,p4', 'fourball: default pairs by draft order');
+
+  // Points: win 1, halve half each, in progress none.
+  const done = (holesUp: number): MatchStatus => ({ pairing: dp[0], through: 9, holesUp, closedOut: false, resultLabel: '' });
+  console.assert(JSON.stringify(matchPoints(done(1), 9)) === '{"a":1,"b":0}', 'points: win = 1');
+  console.assert(JSON.stringify(matchPoints(done(0), 9)) === '{"a":0.5,"b":0.5}', 'points: halve = half each');
+  console.assert(matchPoints({ ...done(2), through: 4 }, 9) === null, 'points: in progress = none');
+  const tp = teamPoints(trip);
+  console.assert(tp.totalAvailable === 2 && tp.toWin === 1.5 && tp.a === 0 && tp.b === 0, 'points: 2 live matches, 1.5 to win');
+
+  // Four-ball settlement over 18 holes: team A wins hole 1 then all halved -> each loser pays $20.
+  const fb18: Round = { ...fb, holesPlayed: '18', skinsEnabled: false };
+  const extra = [];
+  for (let h = 2; h <= 18; h++) for (const p of ['p1', 'p2', 'p3', 'p4']) extra.push({ roundId: 'r1', playerId: p, holeNumber: h, strokes: 4 });
+  const fbLines = computeSettlement({ ...trip, rounds: [fb18], scores: [...trip.scores, ...extra] });
+  console.assert(fbLines.length === 2 && fbLines.every((l) => l.amount === 20), 'fourball settlement: both losers pay $20');
+  const lastHole = matchStatus({ ...trip, scores: [...trip.scores, ...extra] }, fb18, fb18.matches![0]);
+  console.assert(lastHole.resultLabel === '1 up' && !lastHole.closedOut && lastHole.through === 18, 'match: won on 18 reads "1 up", not "1&0"');
 
   const settlement = computeSettlement(trip);
   const net = settlement.reduce((sum, l) => sum + l.amount, 0) - settlement.reduce((sum, l) => sum + l.amount, 0);

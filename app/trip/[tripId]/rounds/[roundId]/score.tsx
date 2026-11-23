@@ -81,8 +81,8 @@ export default function Score() {
   const matches = round.matchEnabled
     ? matchPairings(trip, round).map((pairing) => {
         const st = matchStatus(trip, round, pairing);
-        const a = nameOf(pairing.playerAId);
-        const b = nameOf(pairing.playerBId);
+        const a = pairing.sideA.map(nameOf).join(' & ');
+        const b = pairing.sideB.map(nameOf).join(' & ');
         if (st.through === 0) return `${a} vs ${b} · not started`;
         if (st.holesUp === 0) return `${a} vs ${b} · ${st.resultLabel}`;
         const leader = st.holesUp > 0 ? a : b;

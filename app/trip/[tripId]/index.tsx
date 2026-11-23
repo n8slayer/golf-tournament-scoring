@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../context/TripsContext';
 import { NavCard, PressableLink } from '../../../components/NavCard';
+import { MatchBoard } from '../../../components/MatchBoard';
 import { s, icon } from '../../../lib/styles';
 
 export default function TripHome() {
@@ -23,6 +24,8 @@ export default function TripHome() {
             <Text style={s.subtitle}>
               {trip.courses.length === 1 ? trip.courses[0].name : `${trip.courses.length} courses`} · {trip.players.length} players
             </Text>
+
+            <MatchBoard trip={trip} />
 
             <Text style={[s.label, { marginTop: 8 }]}>Rounds</Text>
           </View>

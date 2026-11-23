@@ -46,8 +46,8 @@ export default function Leaderboard() {
           .filter(() => round.matchEnabled)
           .map((pairing) => {
             const st = matchStatus(trip, round, pairing);
-            const a = nameOf(pairing.playerAId);
-            const b = nameOf(pairing.playerBId);
+            const a = pairing.sideA.map(nameOf).join(' & ');
+            const b = pairing.sideB.map(nameOf).join(' & ');
             if (st.holesUp === 0) return `Match: ${a} vs ${b} halved`;
             return `Match: ${st.holesUp > 0 ? a : b} beat ${st.holesUp > 0 ? b : a} ${st.resultLabel}`;
           }),
