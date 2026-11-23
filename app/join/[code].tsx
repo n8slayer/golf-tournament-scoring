@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../context/TripsContext';
 import { PlayerForm } from '../../components/PlayerForm';
+import { playerSlots, PlayerSlot } from '../../lib/sync';
 import { HomeHeaderButton } from '../../components/HomeHeaderButton';
 import { formatHandicap } from '../../lib/handicap';
 import { s, colors, icon } from '../../lib/styles';
@@ -17,13 +18,27 @@ export default function Join() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [slots, setSlots] = useState<PlayerSlot[]>([]);
   const trip = tripId ? getTrip(tripId) : undefined;
+
+  useEffect(() => {
+    if (tripId)
+      playerSlots(tripId)
+        .then(setSlots)
+        .catch(() => {});
+  }, [tripId]);
 
   useEffect(() => {
     if (!sharing || !code) return;
     joinEvent(code)
       .then(setTripId)
-      .catch((e) => setError(e?.message?.includes('not valid') ? 'This invite link is not valid. Ask the organizer for a new one.' : `Could not join: ${e?.message ?? e}`));
+      .catch((e) =>
+        setError(
+          e?.message?.includes('not valid')
+            ? 'This invite link is not valid. Ask the organizer for a new one.'
+            : `Could not join: ${e?.message ?? e}`,
+        ),
+      );
   }, [code, sharing]);
 
   const done = () => router.replace(`/trip/${tripId}`);
@@ -66,6 +81,23 @@ export default function Join() {
     );
   }
 
+  // Invited by email: already linked to their player, no picking needed.
+  const invitedAs = trip.players.find((p) => p.id === trip.sync?.myPlayerId);
+  if (invitedAs) {
+    return (
+      <View style={[s.screen, s.content]}>
+        <Text style={s.label}>You're in</Text>
+        <Text style={s.h1} accessibilityRole="header">
+          {trip.name}
+        </Text>
+        <Text style={s.title}>You're playing as {invitedAs.name}.</Text>
+        <Pressable onPress={done} accessibilityRole="button" style={({ pressed }) => [s.button, pressed && s.pressed]}>
+          <Text style={s.buttonText}>Open event</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <HomeHeaderButton />
@@ -75,25 +107,40 @@ export default function Join() {
       </Text>
       <Text style={s.title}>Which player are you?</Text>
       <Text style={s.subtitle}>This lets the app show your strokes and scorecard. You can score for your whole group either way.</Text>
-      {trip.players.map((p) => (
-        <Pressable
-          key={p.id}
-          disabled={busy}
-          onPress={() => run(() => claimMyPlayer(trip.id, p.id))}
-          accessibilityRole="button"
-          accessibilityLabel={`I'm ${p.name}`}
-          style={({ pressed }) => [s.card, s.row, { justifyContent: 'flex-start' }, trip.sync?.myPlayerId === p.id && { borderColor: colors.accent, borderWidth: 2 }, pressed && s.pressed]}
-        >
-          <View style={s.iconBadge}>
-            <Ionicons name="person" size={icon.md} color={colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.title}>{p.name}</Text>
-            <Text style={s.subtitle}>Index {formatHandicap(p.handicapIndex)}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={icon.sm} color={colors.muted} />
-        </Pressable>
-      ))}
+      {trip.players.map((p) => {
+        const slot = slots.find((x) => x.player_id === p.id);
+        const locked = slot?.claimed
+          ? `Taken by ${slot.claimed_by ?? 'someone'}`
+          : slot?.reserved && !slot.reserved_for_me
+            ? `Reserved for ${slot.masked_email}`
+            : '';
+        return (
+          <Pressable
+            key={p.id}
+            disabled={busy || !!locked}
+            onPress={() => run(() => claimMyPlayer(trip.id, p.id))}
+            accessibilityRole="button"
+            accessibilityLabel={`I'm ${p.name}`}
+            style={({ pressed }) => [
+              s.card,
+              s.row,
+              { justifyContent: 'flex-start' },
+              trip.sync?.myPlayerId === p.id && { borderColor: colors.accent, borderWidth: 2 },
+              !!locked && { opacity: 0.5 },
+              pressed && s.pressed,
+            ]}
+          >
+            <View style={s.iconBadge}>
+              <Ionicons name="person" size={icon.md} color={colors.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.title}>{p.name}</Text>
+              <Text style={s.subtitle}>{locked || `Index ${formatHandicap(p.handicapIndex)}`}</Text>
+            </View>
+            <Ionicons name={locked ? 'lock-closed' : 'chevron-forward'} size={icon.sm} color={colors.muted} />
+          </Pressable>
+        );
+      })}
       {trip.players.length === 0 && <Text style={s.subtitle}>No players on the roster yet.</Text>}
 
       {adding ? (
@@ -101,7 +148,11 @@ export default function Join() {
           <PlayerForm buttonLabel="Add me to the event" onAdd={(name, idx) => run(() => addMyself(trip.id, name, idx))} />
         </View>
       ) : (
-        <Pressable onPress={() => setAdding(true)} accessibilityRole="button" style={({ pressed }) => [s.buttonSecondary, pressed && s.pressed]}>
+        <Pressable
+          onPress={() => setAdding(true)}
+          accessibilityRole="button"
+          style={({ pressed }) => [s.buttonSecondary, pressed && s.pressed]}
+        >
           <Ionicons name="add" size={icon.sm} color={colors.accent} />
           <Text style={s.buttonTextSecondary}>I'm not listed</Text>
         </Pressable>

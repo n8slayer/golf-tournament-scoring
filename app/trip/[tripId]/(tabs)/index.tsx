@@ -7,8 +7,17 @@ import { useTrips } from '../../../../context/TripsContext';
 import { PressableLink } from '../../../../components/NavCard';
 import { TeamScoreHeader } from '../../../../components/MatchBoard';
 import { joinLink } from '../../../../components/ShareCard';
-import { listMembers } from '../../../../lib/sync';
-import { eventOf, tripStandings, leaderboard, computeSettlement, courseFor, formatOf, allowanceFor, matchPairings } from '../../../../lib/scoring';
+import { playerSlots, PlayerSlot } from '../../../../lib/sync';
+import {
+  eventOf,
+  tripStandings,
+  leaderboard,
+  computeSettlement,
+  courseFor,
+  formatOf,
+  allowanceFor,
+  matchPairings,
+} from '../../../../lib/scoring';
 import { holeNumbersFor } from '../../../../lib/holeRanges';
 import { formatHandicap } from '../../../../lib/handicap';
 import { s, colors, icon } from '../../../../lib/styles';
@@ -108,13 +117,17 @@ function RoundsTab({ trip, canEdit }: { trip: Trip; canEdit: boolean }) {
   const byDate = new Map<string, Round[]>();
   for (const r of [...trip.rounds].sort((a, b) => a.date.localeCompare(b.date))) {
     const d = new Date(r.date);
-    const key = Number.isNaN(d.getTime()) ? 'Rounds' : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const key = Number.isNaN(d.getTime())
+      ? 'Rounds'
+      : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     byDate.set(key, [...(byDate.get(key) ?? []), r]);
   }
   return (
     <View style={{ gap: 10 }}>
       <Text style={st.section}>ROUNDS ({trip.rounds.length})</Text>
-      {trip.rounds.length === 0 && <Text style={s.subtitle}>No rounds yet. {canEdit ? 'Start one when you hit the first tee.' : 'The organizer will start one.'}</Text>}
+      {trip.rounds.length === 0 && (
+        <Text style={s.subtitle}>No rounds yet. {canEdit ? 'Start one when you hit the first tee.' : 'The organizer will start one.'}</Text>
+      )}
       {[...byDate.entries()].map(([date, rounds]) => (
         <View key={date} style={{ gap: 8 }}>
           <Text style={st.date}>{date.toUpperCase()}</Text>
@@ -134,18 +147,23 @@ function RoundsTab({ trip, canEdit }: { trip: Trip; canEdit: boolean }) {
 }
 
 function PlayersTab({ trip }: { trip: Trip }) {
-  const [claimed, setClaimed] = useState<Set<string>>(new Set());
+  const [slots, setSlots] = useState<PlayerSlot[]>([]);
   useEffect(() => {
     if (!trip.sync) return;
-    listMembers(trip.id)
-      .then((m) => setClaimed(new Set(m.map((x) => x.player_id).filter((x): x is string => !!x))))
+    playerSlots(trip.id)
+      .then(setSlots)
       .catch(() => {});
   }, [trip.id, trip.players.length]);
 
   const groups: { name: string; color: string; text: string; ids: string[] }[] =
     trip.teams.length === 2
       ? [
-          ...trip.teams.map((t, i) => ({ name: t.name, color: i ? colors.teamB : colors.teamA, text: i ? colors.teamBText : colors.teamAText, ids: trip.players.filter((p) => p.teamId === t.id).map((p) => p.id) })),
+          ...trip.teams.map((t, i) => ({
+            name: t.name,
+            color: i ? colors.teamB : colors.teamA,
+            text: i ? colors.teamBText : colors.teamAText,
+            ids: trip.players.filter((p) => p.teamId === t.id).map((p) => p.id),
+          })),
           { name: 'Not drafted', color: colors.muted, text: colors.muted, ids: trip.players.filter((p) => !p.teamId).map((p) => p.id) },
         ].filter((g) => g.ids.length)
       : [{ name: 'Players', color: colors.accent, text: colors.accent, ids: trip.players.map((p) => p.id) }];
@@ -168,7 +186,9 @@ function PlayersTab({ trip }: { trip: Trip }) {
             </View>
             {ps.map((p) => {
               const mine = trip.sync?.myPlayerId === p.id;
-              const isClaimed = claimed.has(p.id) || mine;
+              const slot = slots.find((x) => x.player_id === p.id);
+              const isClaimed = !!slot?.claimed || mine;
+              const invited = !isClaimed && !!(slot?.reserved || p.email);
               return (
                 <View key={p.id} style={[s.card, s.row, { paddingVertical: 12, borderLeftWidth: 4, borderLeftColor: g.color }]}>
                   <View style={{ flex: 1 }}>
@@ -176,7 +196,11 @@ function PlayersTab({ trip }: { trip: Trip }) {
                       {p.name}
                       {mine ? ' (you)' : ''}
                     </Text>
-                    {trip.sync && <Text style={[st.meta, { color: isClaimed ? colors.good : colors.muted }]}>{isClaimed ? 'JOINED' : 'NOT JOINED YET'}</Text>}
+                    {trip.sync && (
+                      <Text style={[st.meta, { color: isClaimed ? colors.good : invited ? colors.accent : colors.muted }]}>
+                        {isClaimed ? 'JOINED' : invited ? 'INVITED' : 'NOT JOINED YET'}
+                      </Text>
+                    )}
                   </View>
                   <Text style={st.hcp}>{formatHandicap(p.handicapIndex)}</Text>
                 </View>
@@ -226,7 +250,10 @@ export default function EventHome() {
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
       <View style={{ gap: 4 }}>
-        <Text style={st.kicker}>{FORMAT_NAME[event.type].toUpperCase()}{dates ? ` · ${dates}` : ''}</Text>
+        <Text style={st.kicker}>
+          {FORMAT_NAME[event.type].toUpperCase()}
+          {dates ? ` · ${dates}` : ''}
+        </Text>
         <Text style={[s.h1, { fontSize: 30 }]} accessibilityRole="header">
           {trip.name}
         </Text>
@@ -235,7 +262,9 @@ export default function EventHome() {
 
       {(offline || pending > 0) && (
         <Text style={[s.subtitle, { color: offline ? colors.danger : colors.muted }]}>
-          {offline ? `Offline. ${pending} change${pending === 1 ? '' : 's'} saved on this phone.` : `Syncing ${pending} change${pending === 1 ? '' : 's'}…`}
+          {offline
+            ? `Offline. ${pending} change${pending === 1 ? '' : 's'} saved on this phone.`
+            : `Syncing ${pending} change${pending === 1 ? '' : 's'}…`}
         </Text>
       )}
       {needsPlayer && trip.sync && (
@@ -251,7 +280,9 @@ export default function EventHome() {
         <View style={st.leader}>
           <Text style={st.kicker}>{event.type === 'stableford' ? 'MOST POINTS' : 'LOWEST NET'}</Text>
           <Text style={[s.title, { fontSize: 22 }]}>
-            {leader ? `${leader.playerName} leads · ${event.type === 'stableford' ? `${leader.points} pts` : toPar(leader.netToPar)}` : 'No scores yet'}
+            {leader
+              ? `${leader.playerName} leads · ${event.type === 'stableford' ? `${leader.points} pts` : toPar(leader.netToPar)}`
+              : 'No scores yet'}
           </Text>
         </View>
       )}
@@ -273,7 +304,9 @@ export default function EventHome() {
             accessibilityLabel={key === 'money' ? 'Money' : label}
             style={[st.segBtn, tab === key && st.segActive]}
           >
-            <Text style={[st.segText, tab === key && { color: colors.text }, key === 'money' && { color: colors.good }]}>{label.toUpperCase()}</Text>
+            <Text style={[st.segText, tab === key && { color: colors.text }, key === 'money' && { color: colors.good }]}>
+              {label.toUpperCase()}
+            </Text>
           </Pressable>
         ))}
       </View>

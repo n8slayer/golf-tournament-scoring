@@ -21,9 +21,10 @@ export function ShareCard({ trip }: { trip: Trip }) {
   const [showQr, setShowQr] = useState(false);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { isOwner, refresh } = useTrips();
+  const { isOwner, canEdit, refresh } = useTrips();
   if (!trip.sync) return null;
   const link = joinLink(trip.sync.inviteCode);
+  const code = trip.sync.inviteCode.toUpperCase();
 
   const copy = async () => {
     await Clipboard.setStringAsync(link);
@@ -44,8 +45,21 @@ export function ShareCard({ trip }: { trip: Trip }) {
       `mailto:?subject=${encodeURIComponent(`You're invited: ${trip.name}`)}&body=${encodeURIComponent(
         `${message}
 
-Open the link, sign in with your email (you'll get a code), then pick which player you are.`
-      )}`
+Open the link, sign in with your email (you'll get a code), then pick which player you are.`,
+      )}`,
+    ).catch(copy);
+
+  // Organizers: one email to every player with an address (BCC), each signs in with that address.
+  const invitees = canEdit(trip) ? trip.players.flatMap((p) => (p.email ? [p.email] : [])) : [];
+  const emailAll = () =>
+    Linking.openURL(
+      `mailto:?bcc=${invitees.map(encodeURIComponent).join(',')}&subject=${encodeURIComponent(`You're invited: ${trip.name}`)}&body=${encodeURIComponent(
+        `You're on the player list for ${trip.name}.
+
+Open ${link} and sign in with THIS email address (you'll get a code). You'll go straight into the event as your player, ready to enter scores.
+
+Join code: ${code}`,
+      )}`,
     ).catch(copy);
 
   return (
@@ -70,7 +84,11 @@ Open the link, sign in with your email (you'll get a code), then pick which play
         {link}
       </Text>
       <View style={s.row}>
-        <Pressable onPress={copy} accessibilityRole="button" style={({ pressed }) => [s.buttonSecondary, { flex: 1 }, pressed && s.pressed]}>
+        <Pressable
+          onPress={copy}
+          accessibilityRole="button"
+          style={({ pressed }) => [s.buttonSecondary, { flex: 1 }, pressed && s.pressed]}
+        >
           <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={icon.sm} color={colors.accent} />
           <Text style={s.buttonTextSecondary}>{copied ? 'Copied' : 'Copy link'}</Text>
         </Pressable>
@@ -79,6 +97,12 @@ Open the link, sign in with your email (you'll get a code), then pick which play
           <Text style={s.buttonText}>Share</Text>
         </Pressable>
       </View>
+      {invitees.length > 0 && (
+        <Pressable onPress={emailAll} accessibilityRole="button" style={({ pressed }) => [s.button, pressed && s.pressed]}>
+          <Ionicons name="mail" size={icon.sm} color={colors.onAccent} />
+          <Text style={s.buttonText}>Email all players ({invitees.length})</Text>
+        </Pressable>
+      )}
       <Pressable onPress={email} accessibilityRole="button" style={({ pressed }) => [s.buttonSecondary, pressed && s.pressed]}>
         <Ionicons name="mail-outline" size={icon.sm} color={colors.accent} />
         <Text style={s.buttonTextSecondary}>Email invite</Text>

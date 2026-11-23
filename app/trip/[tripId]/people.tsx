@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-nati
 import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../context/TripsContext';
-import { listMembers, setMemberRole, removeMember, Member } from '../../../lib/sync';
+import { listMembers, setMemberRole, removeMember, unlinkMember, Member } from '../../../lib/sync';
 import { ShareCard } from '../../../components/ShareCard';
 import { s, colors, icon } from '../../../lib/styles';
 
@@ -12,7 +12,7 @@ const ROLE_LABEL = { owner: 'Organizer', admin: 'Co-organizer', player: 'Player'
 // Who's in the event. The organizer can make people co-organizers or remove them.
 export default function People() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, isOwner, userId, refresh } = useTrips();
+  const { getTrip, isOwner, canEdit, userId, refresh } = useTrips();
   const trip = getTrip(tripId);
   const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState('');
@@ -90,6 +90,17 @@ export default function People() {
                 </Text>
               </View>
             </View>
+            {canEdit(trip) && !!m.player_id && (
+              <Pressable
+                disabled={!!busy}
+                onPress={() => act(m.user_id, () => unlinkMember(tripId, m.user_id))}
+                accessibilityRole="button"
+                accessibilityLabel={`Unlink ${m.display_name ?? 'this person'} from ${linked ?? 'their player'}`}
+                style={({ pressed }) => [s.pill, { alignSelf: 'flex-start' }, pressed && s.pressed]}
+              >
+                <Text style={s.pillText}>Unlink player</Text>
+              </Pressable>
+            )}
             {owner && m.role !== 'owner' && (
               <View style={s.pillRow}>
                 <Pressable
@@ -106,7 +117,12 @@ export default function People() {
                     confirmRemove === m.user_id ? act(m.user_id, () => removeMember(tripId, m.user_id)) : setConfirmRemove(m.user_id)
                   }
                   accessibilityRole="button"
-                  style={({ pressed }) => [s.pill, { borderColor: colors.danger }, confirmRemove === m.user_id && { backgroundColor: colors.danger }, pressed && s.pressed]}
+                  style={({ pressed }) => [
+                    s.pill,
+                    { borderColor: colors.danger },
+                    confirmRemove === m.user_id && { backgroundColor: colors.danger },
+                    pressed && s.pressed,
+                  ]}
                 >
                   <Text style={[s.pillText, { color: confirmRemove === m.user_id ? colors.onAccent : colors.danger }]}>
                     {confirmRemove === m.user_id ? 'Tap again to remove' : 'Remove from event'}

@@ -12,7 +12,12 @@ import { NewCourse, EventType } from '../../types/models';
 const EVENT_TYPES: { type: EventType; title: string; blurb: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { type: 'rydercup', title: 'Ryder Cup', blurb: 'Two teams, match play. First to the points target wins the cup.', icon: 'trophy' },
   { type: 'strokeplay', title: 'Stroke play', blurb: 'Every shot counts. Lowest total net score over all rounds wins.', icon: 'golf' },
-  { type: 'stableford', title: 'Stableford', blurb: 'Points per hole (2 for net par). Most points wins; one blow-up hole won’t ruin you.', icon: 'stats-chart' },
+  {
+    type: 'stableford',
+    title: 'Stableford',
+    blurb: 'Points per hole (2 for net par). Most points wins; one blow-up hole won’t ruin you.',
+    icon: 'stats-chart',
+  },
 ];
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -55,12 +60,9 @@ export default function NewTrip() {
         ? 'End date is before the start date.'
         : '';
   const teamError = ryder && teamNames.some((t) => !t.trim()) ? 'Give both teams a name.' : '';
-  const problems = [
-    !name.trim() && 'Name your event.',
-    courses.length === 0 && 'Add at least one course.',
-    dateError,
-    teamError,
-  ].filter(Boolean) as string[];
+  const problems = [!name.trim() && 'Name your event.', courses.length === 0 && 'Add at least one course.', dateError, teamError].filter(
+    Boolean,
+  ) as string[];
   const canSubmit = problems.length === 0;
 
   const submit = () => {
@@ -75,7 +77,7 @@ export default function NewTrip() {
         skinValue: Math.max(0, parseFloat(skinValue) || 0),
         matchStake: Math.max(0, parseFloat(matchStake) || 0),
       },
-      players: players.map((p) => (ryder ? p : { name: p.name, handicapIndex: p.handicapIndex })),
+      players: players.map(({ team, ...rest }) => (ryder ? { ...rest, team } : rest)),
       ...(ryder ? { teamNames: [teamNames[0].trim(), teamNames[1].trim()] as [string, string] } : {}),
     });
     router.replace(`/trip/${id}`);
@@ -88,7 +90,30 @@ export default function NewTrip() {
       </Text>
       <Text style={s.subtitle}>Everything here can be changed later. Players can also join with a link.</Text>
 
-      <Section n={1} title="Event">
+      <Section n={1} title={`Course (${courses.length})`}>
+        {courses.map((c, i) => (
+          <View key={`${c.name}-${c.tee}-${i}`} style={[s.card, s.row, { justifyContent: 'flex-start' }]}>
+            <View style={s.iconBadge}>
+              <Ionicons name="flag" size={icon.md} color={colors.accent} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={s.title}>{c.name}</Text>
+              <Text style={s.subtitle}>{courseSummary(c)}</Text>
+            </View>
+            <Pressable
+              onPress={() => setCourses((prev) => prev.filter((_, j) => j !== i))}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${c.name}`}
+              style={st.iconBtn}
+            >
+              <Ionicons name="close" size={icon.md} color={colors.muted} />
+            </Pressable>
+          </View>
+        ))}
+        <CourseSearch title={courses.length ? 'Add another course' : 'Add a course'} onAdd={(c) => setCourses((prev) => [...prev, c])} />
+      </Section>
+
+      <Section n={2} title="Event">
         <Text style={s.label}>Event name</Text>
         <TextInput
           style={s.input}
@@ -100,7 +125,13 @@ export default function NewTrip() {
         <View style={[s.row, { alignItems: 'flex-start' }]}>
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={s.label}>Starts (optional)</Text>
-            <TextInput style={s.input} value={startDate} onChangeText={setStartDate} placeholder="2026-07-16" accessibilityLabel="Start date" />
+            <TextInput
+              style={s.input}
+              value={startDate}
+              onChangeText={setStartDate}
+              placeholder="2026-07-16"
+              accessibilityLabel="Start date"
+            />
           </View>
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={s.label}>Ends (optional)</Text>
@@ -128,37 +159,51 @@ export default function NewTrip() {
                 <Text style={s.title}>{e.title}</Text>
                 <Text style={s.subtitle}>{e.blurb}</Text>
               </View>
-              <Ionicons name={active ? 'radio-button-on' : 'radio-button-off'} size={icon.md} color={active ? colors.accent : colors.muted} />
+              <Ionicons
+                name={active ? 'radio-button-on' : 'radio-button-off'}
+                size={icon.md}
+                color={active ? colors.accent : colors.muted}
+              />
             </Pressable>
           );
         })}
       </Section>
 
-      <Section n={2} title={`Courses (${courses.length})`}>
-        {courses.map((c, i) => (
-          <View key={`${c.name}-${c.tee}-${i}`} style={[s.card, s.row, { justifyContent: 'flex-start' }]}>
-            <View style={s.iconBadge}>
-              <Ionicons name="flag" size={icon.md} color={colors.accent} />
+      <Section n={3} title={`Players (${players.length})`}>
+        <Text style={s.subtitle}>
+          Add the group now (or later). Add an email and that person is put straight into the event as that player when they sign in.
+        </Text>
+        {players.map((p, i) => (
+          <View key={`${p.name}-${i}`} style={[s.card, { gap: 8 }]}>
+            <View style={s.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.title}>{p.name}</Text>
+                <Text style={s.subtitle}>
+                  Index {formatHandicap(p.handicapIndex)}
+                  {p.email ? ` · ${p.email}` : ' · no email'}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setPlayers((prev) => prev.filter((_, j) => j !== i))}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${p.name}`}
+                style={st.iconBtn}
+              >
+                <Ionicons name="close" size={icon.md} color={colors.muted} />
+              </Pressable>
             </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={s.title}>{c.name}</Text>
-              <Text style={s.subtitle}>{courseSummary(c)}</Text>
-            </View>
-            <Pressable
-              onPress={() => setCourses((prev) => prev.filter((_, j) => j !== i))}
-              accessibilityRole="button"
-              accessibilityLabel={`Remove ${c.name}`}
-              style={st.iconBtn}
-            >
-              <Ionicons name="close" size={icon.md} color={colors.muted} />
-            </Pressable>
           </View>
         ))}
-        <CourseSearch title={courses.length ? 'Add another course' : 'Add a course'} onAdd={(c) => setCourses((prev) => [...prev, c])} />
+        <View style={s.card}>
+          <PlayerForm
+            withEmail
+            onAdd={(n, idx, email) => setPlayers((prev) => [...prev, { name: n, handicapIndex: idx, ...(email ? { email } : {}) }])}
+          />
+        </View>
       </Section>
 
       {ryder && (
-        <Section n={3} title="Teams">
+        <Section n={4} title="Draft teams">
           <View style={s.row}>
             {[0, 1].map((i) => (
               <TextInput
@@ -172,65 +217,60 @@ export default function NewTrip() {
             ))}
           </View>
           {!!teamError && <Text style={{ color: colors.danger }}>{teamError}</Text>}
-          <Text style={s.subtitle}>Put players on a team below, or leave them unassigned and run the draft later.</Text>
+          <Text style={s.subtitle}>Tap a team for each player, or leave them and run the draft later.</Text>
+          {players.length === 0 && <Text style={s.subtitle}>Add players above first.</Text>}
+          {players.map((p, i) => (
+            <View key={`${p.name}-${i}`} style={[s.card, s.row, { paddingVertical: 10 }]}>
+              <Text style={[s.title, { flex: 1 }]}>{p.name}</Text>
+              {ryder && (
+                <View style={s.pillRow}>
+                  {([0, 1] as const).map((t) => {
+                    const active = p.team === t;
+                    const color = t ? colors.teamB : colors.teamA;
+                    return (
+                      <Pressable
+                        key={t}
+                        onPress={() => setPlayers((prev) => prev.map((q, j) => (j === i ? { ...q, team: active ? undefined : t } : q)))}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: active }}
+                        accessibilityLabel={`${p.name} on ${teamNames[t] || `team ${t + 1}`}`}
+                        style={[s.pill, { borderColor: color }, active && { backgroundColor: color }]}
+                      >
+                        <Text style={[s.pillText, { color: active ? colors.onTeam : t ? colors.teamBText : colors.teamAText }]}>
+                          {teamNames[t] || `Team ${t + 1}`}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          ))}
         </Section>
       )}
 
-      <Section n={ryder ? 4 : 3} title={`Players (${players.length})`}>
-        <Text style={s.subtitle}>Optional now. You can add more later, or players can add themselves when they join.</Text>
-        {players.map((p, i) => (
-          <View key={`${p.name}-${i}`} style={[s.card, { gap: 8 }]}>
-            <View style={s.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.title}>{p.name}</Text>
-                <Text style={s.subtitle}>Index {formatHandicap(p.handicapIndex)}</Text>
-              </View>
-              <Pressable
-                onPress={() => setPlayers((prev) => prev.filter((_, j) => j !== i))}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${p.name}`}
-                style={st.iconBtn}
-              >
-                <Ionicons name="close" size={icon.md} color={colors.muted} />
-              </Pressable>
-            </View>
-            {ryder && (
-              <View style={s.pillRow}>
-                {([0, 1] as const).map((t) => {
-                  const active = p.team === t;
-                  const color = t ? colors.teamB : colors.teamA;
-                  return (
-                    <Pressable
-                      key={t}
-                      onPress={() => setPlayers((prev) => prev.map((q, j) => (j === i ? { ...q, team: active ? undefined : t } : q)))}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: active }}
-                      accessibilityLabel={`${p.name} on ${teamNames[t] || `team ${t + 1}`}`}
-                      style={[s.pill, { borderColor: color }, active && { backgroundColor: color }]}
-                    >
-                      <Text style={[s.pillText, { color: active ? colors.onTeam : t ? colors.teamBText : colors.teamAText }]}>{teamNames[t] || `Team ${t + 1}`}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        ))}
-        <View style={s.card}>
-          <PlayerForm onAdd={(n, idx) => setPlayers((prev) => [...prev, { name: n, handicapIndex: idx }])} />
-        </View>
-      </Section>
-
-      <Section n={ryder ? 5 : 4} title="Side games">
+      <Section n={ryder ? 5 : 4} title="Individual bets">
         <Text style={s.subtitle}>Defaults for each new round. Set 0 to play for bragging rights.</Text>
         <View style={s.row}>
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={s.label}>$ per skin</Text>
-            <TextInput style={s.input} value={skinValue} onChangeText={setSkinValue} keyboardType="decimal-pad" accessibilityLabel="Dollars per skin" />
+            <TextInput
+              style={s.input}
+              value={skinValue}
+              onChangeText={setSkinValue}
+              keyboardType="decimal-pad"
+              accessibilityLabel="Dollars per skin"
+            />
           </View>
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={s.label}>$ per match</Text>
-            <TextInput style={s.input} value={matchStake} onChangeText={setMatchStake} keyboardType="decimal-pad" accessibilityLabel="Dollars per match" />
+            <TextInput
+              style={s.input}
+              value={matchStake}
+              onChangeText={setMatchStake}
+              keyboardType="decimal-pad"
+              accessibilityLabel="Dollars per match"
+            />
           </View>
         </View>
       </Section>

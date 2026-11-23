@@ -3,6 +3,9 @@ export interface Player {
   name: string;
   handicapIndex: number;
   teamId?: string;
+  // Invite email. Kept on this device + in the private player_emails table (editors only),
+  // never in the shared event data.
+  email?: string;
 }
 
 export interface Team {

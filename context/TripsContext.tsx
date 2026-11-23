@@ -7,6 +7,8 @@ import { useAuth } from './AuthContext';
 import {
   fetchTrips,
   pushTrip,
+  pushPlayerEmails,
+  acceptInvites,
   pushScore,
   joinTrip,
   claimPlayer,
@@ -22,7 +24,7 @@ export interface TripSetup {
   name: string;
   courses: NewCourse[];
   event: EventSettings;
-  players: { name: string; handicapIndex: number; team?: 0 | 1 }[];
+  players: { name: string; handicapIndex: number; email?: string; team?: 0 | 1 }[];
   teamNames?: [string, string];
 }
 
@@ -48,7 +50,7 @@ interface TripsContextValue {
   canEdit: (trip: Trip) => boolean; // organizer or co-organizer
   isOwner: (trip: Trip) => boolean; // the organizer
   addTrip: (setup: TripSetup) => string;
-  addPlayer: (tripId: string, name: string, handicapIndex: number) => void;
+  addPlayer: (tripId: string, name: string, handicapIndex: number, email?: string) => void;
   updatePlayer: (tripId: string, playerId: string, patch: Partial<Player>) => void;
   removePlayer: (tripId: string, playerId: string) => void;
   ensureTeams: (tripId: string) => void;
@@ -114,6 +116,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
             if (trip && canEdit(trip)) {
               const res = await pushTrip(trip);
               if (!trip.sync) commit((prev) => prev.map((t) => (t.id === trip.id ? { ...t, sync: res } : t)));
+              await pushPlayerEmails(trip);
             }
           } else {
             await pushScore(op.tripId, op.score);
@@ -173,6 +176,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     if (!supabase || !uid) return;
     try {
       await flush();
+      await acceptInvites().catch((e) => console.warn('Invites:', (e as Error)?.message ?? e));
       mergeRemote(await fetchTrips(uid));
       setOffline(false);
     } catch (e) {
@@ -244,7 +248,16 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trips' }, (payload) => {
         const row = payload.new as { id: string; updated_by?: string; data: Trip };
         if (row.updated_by === userIdRef.current) return; // our own save echoing back
-        commit((prev) => prev.map((t) => (t.id === row.id ? migrateTrip({ ...row.data, id: t.id, scores: t.scores, sync: t.sync }) : t)));
+        // trips.data never carries emails: keep the ones this device already has, or the next
+        // save would wipe the invite emails.
+        commit((prev) =>
+          prev.map((t) => {
+            if (t.id !== row.id) return t;
+            const emailOf = new Map(t.players.filter((p) => p.email).map((p) => [p.id, p.email]));
+            const next = migrateTrip({ ...row.data, id: t.id, scores: t.scores, sync: t.sync });
+            return { ...next, players: next.players.map((p) => (emailOf.has(p.id) ? { ...p, email: emailOf.get(p.id) } : p)) };
+          })
+        );
       })
       // Someone was made co-organizer / removed: reload roles.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_members' }, () => refresh())
@@ -290,6 +303,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
         id: genId(),
         name: p.name,
         handicapIndex: p.handicapIndex,
+        ...(p.email?.trim() ? { email: p.email.trim().toLowerCase() } : {}),
         ...(p.team !== undefined && teams[p.team] ? { teamId: teams[p.team].id } : {}),
       })),
       teams,
@@ -302,10 +316,10 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     return id;
   };
 
-  const addPlayer = (tripId: string, name: string, handicapIndex: number) => {
+  const addPlayer = (tripId: string, name: string, handicapIndex: number, email?: string) => {
     updateTrip(tripId, (t) => ({
       ...t,
-      players: [...t.players, { id: genId(), name, handicapIndex }],
+      players: [...t.players, { id: genId(), name, handicapIndex, ...(email?.trim() ? { email: email.trim().toLowerCase() } : {}) }],
     }));
   };
 

@@ -17,7 +17,8 @@ export const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 
 export function tripData(trip: Trip) {
   const { id: _id, scores: _scores, sync: _sync, ...data } = trip;
-  return data;
+  // Player emails never go into the shared event data (see player_emails).
+  return { ...data, players: data.players.map(({ email: _email, ...p }) => p) };
 }
 
 // A network failure (keep queued, retry later) vs a refusal from the server (drop it).
@@ -62,9 +63,20 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
     db.from('trip_members').select('trip_id, player_id, role').eq('user_id', userId),
   ]);
   if (members.error) throw members.error;
+  // Emails come back only for events I edit (RLS) and invites addressed to me.
+  const emails = ids.length
+    ? await db.from('player_emails').select('trip_id, player_id, email').in('trip_id', ids)
+    : { data: [], error: null };
+  if (emails.error) throw emails.error;
+  const emailOf = (tripId: string, playerId: string) =>
+    emails.data?.find((e) => e.trip_id === tripId && e.player_id === playerId)?.email;
   return (rows ?? []).map((r) =>
     migrateTrip({
       ...(r.data as Trip),
+      players: ((r.data as Trip).players ?? []).map((p) => {
+        const email = emailOf(r.id, p.id);
+        return email ? { ...p, email } : p;
+      }),
       id: r.id,
       scores: scores
         .filter((s) => s.trip_id === r.id)
@@ -91,6 +103,49 @@ export async function pushTrip(trip: Trip): Promise<{ inviteCode: string; organi
   const { data, error } = await q.select('invite_code, organizer_id').single();
   if (error) throw error;
   return { inviteCode: data.invite_code, organizerId: data.organizer_id };
+}
+
+// Editors: make the player_emails table match the players' emails on this device.
+export async function pushPlayerEmails(trip: Trip): Promise<void> {
+  const db = client();
+  const withEmail = trip.players.filter((p) => p.email?.trim());
+  if (withEmail.length) {
+    const { error } = await db
+      .from('player_emails')
+      .upsert(withEmail.map((p) => ({ trip_id: trip.id, player_id: p.id, email: p.email!.trim().toLowerCase() })));
+    if (error) throw error;
+  }
+  const keep = withEmail.map((p) => p.id);
+  let del = db.from('player_emails').delete().eq('trip_id', trip.id);
+  if (keep.length) del = del.not('player_id', 'in', `(${keep.map((k) => `"${k}"`).join(',')})`);
+  const { error } = await del;
+  if (error) throw error;
+}
+
+// Join every event whose organizer invited my email, linked to my player.
+export async function acceptInvites(): Promise<void> {
+  const { error } = await client().rpc('accept_invites');
+  if (error) throw error;
+}
+
+export interface PlayerSlot {
+  player_id: string;
+  claimed: boolean;
+  claimed_by: string | null;
+  reserved: boolean;
+  reserved_for_me: boolean;
+  masked_email: string | null;
+}
+
+export async function playerSlots(tripId: string): Promise<PlayerSlot[]> {
+  const { data, error } = await client().rpc('player_slots', { t: tripId });
+  if (error) throw error;
+  return (data ?? []) as PlayerSlot[];
+}
+
+export async function unlinkMember(tripId: string, userId: string): Promise<void> {
+  const { error } = await client().rpc('unlink_member', { t: tripId, member: userId });
+  if (error) throw error;
 }
 
 export interface Member {
