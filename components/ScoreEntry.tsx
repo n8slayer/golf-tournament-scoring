@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../context/TripsContext';
 import { holeNumbersFor } from '../lib/holeRanges';
 import { strokesReceivedOnHole, courseHandicap, formatHandicap } from '../lib/handicap';
-import { leaderboard, matchPairings, matchStatus, courseFor, eventOf, formatOf, isTeamBall, sideHandicap } from '../lib/scoring';
+import { leaderboard, matchPairings, matchStatus, courseFor, eventOf, formatOf, isTeamBall, sideHandicap, teeGroups } from '../lib/scoring';
 import { router } from 'expo-router';
 import { s, colors, icon } from '../lib/styles';
 import { Trip, Round } from '../types/models';
@@ -20,9 +20,9 @@ function toParLabel(diff: number): { text: string; color: string } {
 const toParText = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`);
 
 // Index of the first hole someone still needs a score on (last hole if all done).
-function firstOpenHole(trip: Trip, round: Round, holes: number[]): number {
+function firstOpenHole(trip: Trip, round: Round, holes: number[], ids: string[] = round.playerIds): number {
   const i = holes.findIndex((n) =>
-    round.playerIds.some((pid) => !trip.scores.some((sc) => sc.roundId === round.id && sc.playerId === pid && sc.holeNumber === n)),
+    ids.some((pid) => !trip.scores.some((sc) => sc.roundId === round.id && sc.playerId === pid && sc.holeNumber === n)),
   );
   return i === -1 ? holes.length - 1 : i;
 }
@@ -37,6 +37,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   const round = trip?.rounds.find((r) => r.id === roundId);
   const holes = round ? holeNumbersFor(round.holesPlayed) : [];
   const [index, setIndex] = useState(0);
+  const [pickedGroup, setPickedGroup] = useState<number | null>(null); // null = the group you play in
   const strip = useRef<ScrollViewInstance>(null);
   const [stripWidth, setStripWidth] = useState(0);
 
@@ -45,7 +46,9 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   useEffect(() => {
     if (resumed.current || !trip || !round) return;
     resumed.current = true;
-    setIndex(firstOpenHole(trip, round, holes));
+    const mineId = trip.sync?.myPlayerId;
+    const own = teeGroups(trip, round).find((g) => !!mineId && g.includes(mineId));
+    setIndex(firstOpenHole(trip, round, holes, own));
   }, [trip, round, holes]);
 
   // Keep the current hole chip in view on narrow screens.
@@ -60,10 +63,24 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   const hole = course.holes.find((h) => h.number === holeNumber)!;
   // Your own player first (if you've said which one you are).
   const mine = trip.sync?.myPlayerId;
-  const players = trip.players.filter((p) => round.playerIds.includes(p.id)).sort((a, b) => (a.id === mine ? -1 : b.id === mine ? 1 : 0));
+  // Score one tee time (max 4 players): yours by default, switchable.
+  const groups = teeGroups(trip, round);
+  const groupIndex =
+    pickedGroup ??
+    Math.max(
+      0,
+      groups.findIndex((g) => !!mine && g.includes(mine)),
+    );
+  const group = groups[groupIndex] ?? round.playerIds;
+  const players = trip.players.filter((p) => group.includes(p.id)).sort((a, b) => (a.id === mine ? -1 : b.id === mine ? 1 : 0));
   // Who gets a score row: each player, or each side in alternate shot / scramble (one ball per side;
   // its score is saved for every player on the side). Your own row first.
-  const sides = round.matchEnabled && isTeamBall(formatOf(round)) ? matchPairings(trip, round).flatMap((m) => [m.sideA, m.sideB]) : [];
+  const sides =
+    round.matchEnabled && isTeamBall(formatOf(round))
+      ? matchPairings(trip, round)
+          .flatMap((m) => [m.sideA, m.sideB])
+          .filter((ids) => ids.some((id) => group.includes(id)))
+      : [];
   const onASide = new Set(sides.flat());
   const entries = [
     ...sides.map((ids) => ({
@@ -81,7 +98,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   const strokesFor = (playerId: string, n = holeNumber) =>
     roundScores.find((sc) => sc.playerId === playerId && sc.holeNumber === n)?.strokes;
   const holeDone = (n: number) => players.length > 0 && players.every((p) => strokesFor(p.id, n) !== undefined);
-  const reachable = firstOpenHole(trip, round, holes); // can't skip past an unfinished hole
+  const reachable = firstOpenHole(trip, round, holes, group); // can't skip past an unfinished hole
   const isLast = index === holes.length - 1;
   const canAdvance = !isLast && holeDone(holeNumber);
   const roundDone = holes.every(holeDone);
@@ -205,6 +222,31 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
       </View>
 
       <ScrollView contentContainerStyle={s.content}>
+        {groups.length > 1 && (
+          <View style={{ gap: 6 }}>
+            <View style={s.pillRow} accessibilityRole="tablist">
+              {groups.map((g, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => {
+                    setPickedGroup(i);
+                    setIndex(firstOpenHole(trip, round, holes, g));
+                  }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: i === groupIndex }}
+                  accessibilityLabel={`Group ${i + 1}: ${g.map((id) => trip.players.find((x) => x.id === id)?.name ?? '?').join(', ')}`}
+                  style={[s.pill, i === groupIndex && s.pillActive]}
+                >
+                  <Text style={i === groupIndex ? s.pillTextActive : s.pillText}>
+                    Group {i + 1}
+                    {!!mine && g.includes(mine) ? ' (you)' : ''}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={[s.subtitle, { fontSize: 13 }]}>Scoring for {players.map((p) => p.name).join(', ')}</Text>
+          </View>
+        )}
         {entries.map((p) => {
           const strokes = strokesFor(p.id);
           const ch = p.ch;

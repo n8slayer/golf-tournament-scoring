@@ -141,6 +141,22 @@ export function matchPairings(trip: Trip, round: Round): MatchPairing[] {
   return round.matches ?? defaultPairings(trip, round.playerIds, 'singles');
 }
 
+// Tee times: at most 4 play together. Matches fill groups in order (two singles, or one 2 v 2 match);
+// round players not in a match follow, 4 to a group.
+export function teeGroups(trip: Trip, round: Round): string[][] {
+  const groups: string[][] = [];
+  for (const m of round.matchEnabled ? matchPairings(trip, round) : []) {
+    const ids = [...m.sideA, ...m.sideB];
+    const last = groups[groups.length - 1];
+    if (last && last.length + ids.length <= 4) last.push(...ids);
+    else groups.push([...ids]);
+  }
+  const inMatch = new Set(groups.flat());
+  const rest = round.playerIds.filter((id) => !inMatch.has(id));
+  for (let i = 0; i < rest.length; i += 4) groups.push(rest.slice(i, i + 4));
+  return groups;
+}
+
 export interface MatchStatus {
   pairing: MatchPairing;
   through: number;
@@ -525,6 +541,44 @@ function selfCheck() {
   console.assert(
     dp.length === 1 && dp[0].sideA.join() === 'p1,p3' && dp[0].sideB.join() === 'p2,p4',
     'fourball: default pairs by draft order',
+  );
+
+  // Tee groups: three singles -> 4 + 2; two four-balls -> 4 + 4; no matches, 6 players -> 4 + 2.
+  const six = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+  const singles3: Round = {
+    ...trip.rounds[0],
+    playerIds: six,
+    matches: [
+      { id: 'a', sideA: ['p1'], sideB: ['p2'] },
+      { id: 'b', sideA: ['p3'], sideB: ['p4'] },
+      { id: 'c', sideA: ['p5'], sideB: ['p6'] },
+    ],
+  };
+  console.assert(
+    teeGroups(trip, singles3)
+      .map((g) => g.length)
+      .join() === '4,2',
+    'groups: two singles per tee time',
+  );
+  const fb2: Round = {
+    ...singles3,
+    format: 'fourball',
+    matches: [
+      { id: 'a', sideA: ['p1', 'p3'], sideB: ['p2', 'p4'] },
+      { id: 'b', sideA: ['p5'], sideB: ['p6'] },
+    ],
+  };
+  console.assert(
+    teeGroups(trip, fb2)
+      .map((g) => g.length)
+      .join() === '4,2',
+    'groups: one 2 v 2 match per tee time',
+  );
+  console.assert(
+    teeGroups(trip, { ...singles3, matchEnabled: false })
+      .map((g) => g.length)
+      .join() === '4,2',
+    'groups: no matches, 4 to a group',
   );
 
   // Points: win 1, halve half each, in progress none.

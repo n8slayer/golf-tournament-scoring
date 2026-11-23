@@ -41,6 +41,17 @@ export function MatchBuilder({
   const [teamA, teamB] = trip.teams;
   const size = sideSize(format);
   const roster = (teamId: string) => trip.players.filter((p) => p.teamId === teamId && playerIds.includes(p.id));
+  // Tee times hold 4: two singles, or one 2 v 2 match, per group (matches teeGroups in lib/scoring).
+  const groupOf: number[] = [];
+  matches.reduce(
+    (acc, _m, i) => {
+      const fits = i > 0 && acc.fill + 2 * size <= 4;
+      const g = fits ? acc.g : acc.g + 1;
+      groupOf.push(g);
+      return { g, fill: (fits ? acc.fill : 0) + 2 * size };
+    },
+    { g: -1, fill: 0 },
+  );
   const used = new Set(matches.flatMap((m) => [...m.sideA, ...m.sideB]).filter(Boolean));
 
   const [picking, setPicking] = useState<{ mi: number; side: 'sideA' | 'sideB'; si: number } | null>(null);
@@ -208,6 +219,7 @@ export function MatchBuilder({
           </View>
           {matches.map((m, mi) => (
             <View key={mi} style={{ gap: 8 }}>
+              {(mi === 0 || groupOf[mi] !== groupOf[mi - 1]) && <Text style={st.groupLabel}>GROUP {groupOf[mi] + 1} · TEE TIME</Text>}
               <View style={st.matchRow}>
                 {sideBar(mi, 'sideA')}
                 <View style={st.middle}>
@@ -269,5 +281,6 @@ const st = StyleSheet.create({
   middle: { width: 40, alignItems: 'center', justifyContent: 'center', gap: 2 },
   matchNo: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   matchNoText: { color: colors.onAccent, fontWeight: '800', fontSize: 14 },
+  groupLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 4 },
   picker: { gap: 8, padding: 10, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.accent },
 });
