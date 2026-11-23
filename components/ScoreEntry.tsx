@@ -193,9 +193,6 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
           const ch = courseHandicap(p.handicapIndex, course);
           const popsOn = (n: number) => strokesReceivedOnHole(ch, course.holes.find((h) => h.number === n)?.strokeIndex ?? 99);
           const pops = popsOn(holeNumber);
-          const strokeHoles = holes
-            .filter((n) => popsOn(n) !== 0)
-            .map((n) => (Math.abs(popsOn(n)) > 1 ? `${n}×${Math.abs(popsOn(n))}` : String(n)));
           const label = strokes !== undefined ? toParLabel(strokes - hole.par) : null;
           return (
             <View key={p.id} style={s.card}>
@@ -246,10 +243,43 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
                   </Pressable>
                 </View>
               </View>
-              <Text style={hb.strokeHoles}>
-                Course HCP {formatHandicap(ch)} ·{' '}
-                {strokeHoles.length ? `${ch < 0 ? 'gives back on' : 'strokes on'} ${strokeHoles.join(', ')}` : 'no strokes this round'}
-              </Text>
+              <View style={hb.strokeHoles}>
+                <Text style={hb.strokeTitle}>
+                  {ch < 0 ? `Gives back strokes · HCP ${formatHandicap(ch)}` : `Strokes by hole · HCP ${formatHandicap(ch)}`}
+                </Text>
+                {/* Scorecard style: a dot above each hole per stroke received (hollow = gives one back). */}
+                {[holes.slice(0, 9), holes.slice(9)]
+                  .filter((row) => row.length)
+                  .map((row) => (
+                    <View key={row[0]} style={hb.strokeRow}>
+                      {row.map((n) => {
+                        const k = popsOn(n);
+                        const here = n === holeNumber;
+                        return (
+                          <View
+                            key={n}
+                            style={[hb.strokeCell, here && hb.strokeCellHere]}
+                            accessibilityLabel={`Hole ${n}: ${k > 0 ? `${k} stroke${k > 1 ? 's' : ''}` : k < 0 ? `gives back ${-k}` : 'no stroke'}`}
+                          >
+                            <View style={hb.strokeDots}>
+                              {Array.from({ length: Math.abs(k) }, (_, i) => (
+                                <View
+                                  key={i}
+                                  style={[
+                                    hb.miniDot,
+                                    k < 0 && hb.miniDotBack,
+                                    here && { backgroundColor: k < 0 ? 'transparent' : colors.onAccent, borderColor: colors.onAccent },
+                                  ]}
+                                />
+                              ))}
+                            </View>
+                            <Text style={[hb.strokeNum, here && { color: colors.onAccent }]}>{n}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ))}
+              </View>
             </View>
           );
         })}
@@ -327,7 +357,15 @@ const hb = StyleSheet.create({
   chipLocked: { opacity: 0.35 },
   chipText: { color: colors.text, fontWeight: '700', fontSize: 15 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
-  strokeHoles: { fontSize: 13, color: colors.muted, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 },
+  strokeHoles: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8, gap: 6 },
+  strokeTitle: { fontSize: 12, color: colors.muted, fontWeight: '700', letterSpacing: 0.5 },
+  strokeRow: { flexDirection: 'row', gap: 3 },
+  strokeCell: { flex: 1, alignItems: 'center', paddingVertical: 3, borderRadius: 6 },
+  strokeCellHere: { backgroundColor: colors.accent },
+  strokeDots: { flexDirection: 'row', gap: 2, height: 6, alignItems: 'center' },
+  miniDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent },
+  miniDotBack: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.accent },
+  strokeNum: { fontSize: 13, color: colors.text, fontWeight: '600', fontVariant: ['tabular-nums'] },
   stepBtn: {
     width: 48,
     height: 48,
