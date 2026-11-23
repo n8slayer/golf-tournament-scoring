@@ -78,7 +78,13 @@ export default function SignIn() {
 
   return (
     <View style={s.screen}>
-      <ImageBackground source={require('../assets/signin-links.jpg')} resizeMode="cover" style={st.photo} accessibilityIgnoresInvertColors>
+      <ImageBackground
+        source={require('../assets/signin-links.jpg')}
+        resizeMode="cover"
+        style={st.photo}
+        imageStyle={{ width: '100%', height: '100%' }}
+        accessibilityIgnoresInvertColors
+      >
         {/* Photo fades into the page colour so the card and text stay readable. */}
         <View style={st.fade} />
       </ImageBackground>
@@ -262,7 +268,7 @@ const serif = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Geor
 const fadeGradient = 'linear-gradient(180deg, rgba(11,22,38,0.25) 0%, rgba(11,22,38,0.55) 50%, rgba(11,22,38,0.92) 80%, #0B1626 100%)';
 
 const st = StyleSheet.create({
-  photo: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  photo: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   fade: {
     flex: 1,
     ...(Platform.OS === 'web' ? ({ backgroundImage: fadeGradient } as object) : { experimental_backgroundImage: fadeGradient }),
