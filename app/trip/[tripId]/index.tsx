@@ -7,18 +7,20 @@ import { MatchBoard } from '../../../components/MatchBoard';
 import { StandingsBoard } from '../../../components/StandingsBoard';
 import { eventOf } from '../../../lib/scoring';
 import { ShareCard } from '../../../components/ShareCard';
+import { HomeHeaderButton } from '../../../components/HomeHeaderButton';
 import { s, icon, colors } from '../../../lib/styles';
 
 export default function TripHome() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, isOrganizer, offline, pending } = useTrips();
+  const { getTrip, canEdit, offline, pending } = useTrips();
   const trip = getTrip(tripId);
   if (!trip) return null;
-  const organizer = isOrganizer(trip);
+  const organizer = canEdit(trip);
   const needsPlayer = !organizer && trip.sync && !trip.sync.myPlayerId;
 
   return (
     <View style={s.screen}>
+      <HomeHeaderButton />
       <FlatList
         contentContainerStyle={s.content}
         data={trip.rounds}
@@ -38,7 +40,7 @@ export default function TripHome() {
               </Text>
             )}
             {!organizer && (
-              <Text style={s.subtitle}>You joined this event. Only the organizer can change its setup; anyone can enter scores.</Text>
+              <Text style={s.subtitle}>You're a player in this event: you can enter scores. Organizers change the setup.</Text>
             )}
             {needsPlayer && trip.sync && (
               <PressableLink href={`/join/${trip.sync.inviteCode}`} style={s.buttonSecondary}>
@@ -94,6 +96,14 @@ export default function TripHome() {
                 icon="shuffle"
                 title="Teams & draft"
                 subtitle={trip.teams.length === 2 ? trip.teams.map((tm) => tm.name).join(' vs ') : 'Not started'}
+              />
+            )}
+            {trip.sync && (
+              <NavCard
+                href={`/trip/${tripId}/people`}
+                icon="people-circle"
+                title="People & roles"
+                subtitle={trip.sync.role === 'owner' ? 'You’re the organizer · add co-organizers' : trip.sync.role === 'admin' ? 'You’re a co-organizer' : 'Who’s in this event'}
               />
             )}
             <NavCard href={`/trip/${tripId}/settlement`} icon="cash" title="Settle up" subtitle="Who owes who" />

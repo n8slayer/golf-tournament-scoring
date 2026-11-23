@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../context/TripsContext';
 import { PlayerForm } from '../../components/PlayerForm';
+import { HomeHeaderButton } from '../../components/HomeHeaderButton';
 import { formatHandicap } from '../../lib/handicap';
 import { s, colors, icon } from '../../lib/styles';
 
@@ -67,6 +68,7 @@ export default function Join() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+      <HomeHeaderButton />
       <Text style={s.label}>You're in</Text>
       <Text style={s.h1} accessibilityRole="header">
         {trip.name}

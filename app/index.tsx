@@ -1,11 +1,13 @@
-import { View, Text, FlatList } from 'react-native';
+import { View, Text, FlatList, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../context/TripsContext';
+import { useAuth } from '../context/AuthContext';
 import { NavCard, PressableLink } from '../components/NavCard';
 import { s, colors, icon } from '../lib/styles';
 
 export default function TripList() {
   const { trips, loaded } = useTrips();
+  const { user, displayName, signOut } = useAuth();
 
   if (!loaded) {
     return (
@@ -25,6 +27,20 @@ export default function TripList() {
         keyExtractor={(t) => t.id}
         ListHeaderComponent={
           <View style={{ gap: 12, marginBottom: 4 }}>
+            {user && (
+              <View style={[s.card, s.row, { paddingVertical: 10 }]}>
+                <Ionicons name="person-circle" size={icon.lg} color={colors.accent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.title, { fontSize: 16 }]}>{displayName ?? 'Signed in'}</Text>
+                  <Text style={s.subtitle} numberOfLines={1}>
+                    {user.email}
+                  </Text>
+                </View>
+                <Pressable onPress={signOut} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
+                  <Text style={s.linkText}>Sign out</Text>
+                </Pressable>
+              </View>
+            )}
             <Text style={s.h1} accessibilityRole="header">Your trips</Text>
             <Text style={s.subtitle}>Scores, skins, matches and who owes who, all in one place.</Text>
             <PressableLink href="/trip/new" style={s.button}>

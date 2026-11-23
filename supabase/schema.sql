@@ -1,5 +1,6 @@
 -- Golf trip app: shared events. Run once in Supabase → SQL Editor → New query → Run.
 -- Safe to re-run (uses IF NOT EXISTS / CREATE OR REPLACE / DROP POLICY IF EXISTS).
+-- Then run 002_accounts_roles.sql (email accounts + co-organizers), which replaces some rules below.
 --
 -- Who can do what (enforced by Row Level Security, not by the app):
 --   organizer (device that created the event): everything on their event

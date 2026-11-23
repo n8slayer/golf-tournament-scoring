@@ -16,6 +16,7 @@ export default function TripLayout() {
       <Stack.Screen name="course" options={{ title: 'Course Setup' }} />
       <Stack.Screen name="draft" options={{ title: 'Team Draft' }} />
       <Stack.Screen name="settlement" options={{ title: 'Settlement' }} />
+      <Stack.Screen name="people" options={{ title: 'People & roles' }} />
       <Stack.Screen name="rounds/new" options={{ title: 'New Round' }} />
       <Stack.Screen name="rounds/[roundId]" options={{ headerShown: false }} />
     </Stack>

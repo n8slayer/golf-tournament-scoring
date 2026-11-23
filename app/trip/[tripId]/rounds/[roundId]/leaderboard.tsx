@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../../context/TripsContext';
@@ -7,6 +7,7 @@ import { leaderboard, computeSettlement, courseFor, skinsForRound, matchPairings
 import { holeNumbersFor } from '../../../../../lib/holeRanges';
 import { PressableLink } from '../../../../../components/NavCard';
 import { Scorecard } from '../../../../../components/Scorecard';
+import { TvTable, HoleByHole, ScoringStats, ModeToggle, Mode, BoardRow, toPar, parColor } from '../../../../../components/TvBoard';
 import { s, colors, icon } from '../../../../../lib/styles';
 
 const toParText = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`);
@@ -14,7 +15,7 @@ const toParText = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`);
 export default function Leaderboard() {
   const { tripId, roundId } = useLocalSearchParams<{ tripId: string; roundId: string }>();
   const { getTrip } = useTrips();
-  const [open, setOpen] = useState<string[]>([]);
+  const [mode, setMode] = useState<Mode>('net');
   const trip = getTrip(tripId);
   const round = trip?.rounds.find((r) => r.id === roundId);
   if (!trip || !round) return null;
@@ -55,9 +56,39 @@ export default function Leaderboard() {
             return `Match: ${st.holesUp > 0 ? a : b} beat ${st.holesUp > 0 ? b : a} ${st.resultLabel}`;
           }),
       ];
-  const strokesFor = (playerId: string) => (n: number) =>
+  const strokesOf = (playerId: string, n: number) =>
     trip.scores.find((sc) => sc.roundId === roundId && sc.playerId === playerId && sc.holeNumber === n)?.strokes;
-  const toggle = (id: string) => setOpen((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const total = holeNumbers.length;
+
+  // TV board rows. Players with nothing entered sort last.
+  const boardRows: BoardRow[] = rows
+    .map((r) => {
+      const grossToPar = r.netToPar + (r.gross - r.net);
+      const shownToPar = mode === 'net' ? r.netToPar : grossToPar;
+      const started = r.thru > 0;
+      const thru = r.thru === total ? 'F' : started ? String(r.thru) : '–';
+      return {
+        key: r.playerId,
+        name: r.playerName,
+        sortValue: !started ? 9999 : stableford ? -r.points : mode === 'net' ? r.net : r.gross,
+        cells: stableford
+          ? [
+              { text: started ? String(r.points) : '–', bold: true },
+              { text: thru },
+              { text: started ? String(r.gross) : '–' },
+              { text: started ? String(r.net) : '–' },
+            ]
+          : [
+              { text: started ? toPar(shownToPar) : '–', color: parColor(shownToPar), bold: true },
+              { text: thru },
+              { text: started ? String(r.gross) : '–' },
+              { text: started ? String(r.net) : '–' },
+            ],
+        a11y: `${r.playerName}, ${stableford ? `${r.points} points` : `${toPar(shownToPar)} ${mode}`}, thru ${thru}, gross ${r.gross}, net ${r.net}`,
+      };
+    })
+    .sort((a, b) => a.sortValue - b.sortValue);
+  const roundPlayers = rows.map((r) => ({ id: r.playerId, name: r.playerName }));
 
   const header = (
     <View style={{ gap: 12 }}>
@@ -96,75 +127,51 @@ export default function Leaderboard() {
         </View>
       )}
 
-      <Text style={s.subtitle}>
-        {roundDone ? 'Final results, ranked by' : 'Ranked by'} {stableford ? 'Stableford points' : 'net score'}.
-        {roundDone ? '' : ' Thru = holes entered.'} Tap a
-        player for their scorecard.
-      </Text>
     </View>
   );
 
   return (
-    <View style={s.screen}>
-      <FlatList
-        contentContainerStyle={s.content}
-        data={rows}
-        keyExtractor={(r) => r.playerId}
-        ListHeaderComponent={header}
-        ListFooterComponent={
-          roundDone ? (
-            <View style={{ gap: 12, marginTop: 8 }}>
-              <PressableLink href={`/trip/${tripId}`} dismissTo style={s.button}>
-                <Ionicons name="home" size={icon.sm} color="#fff" />
-                <Text style={s.buttonText}>Back to trip</Text>
-              </PressableLink>
-              <PressableLink href="/" dismissTo style={s.buttonSecondary}>
-                <Text style={s.buttonTextSecondary}>All trips</Text>
-              </PressableLink>
-            </View>
-          ) : undefined
-        }
-        renderItem={({ item, index }) => {
-          const leader = item.thru > 0 && (stableford ? item.points === rows[0].points : item.net === rows[0].net);
-          const expanded = open.includes(item.playerId);
-          return (
-            <View style={[s.card, leader && { borderColor: colors.accent, borderWidth: 2 }]}>
-              <Pressable
-                onPress={() => toggle(item.playerId)}
-                accessibilityRole="button"
-                accessibilityState={{ expanded }}
-                accessibilityLabel={`${index + 1}. ${item.playerName}, net ${item.net}, gross ${item.gross}, thru ${item.thru}. ${expanded ? 'Hide' : 'Show'} scorecard`}
-                style={({ pressed }) => [s.row, { justifyContent: 'flex-start' }, pressed && s.pressed]}
-              >
-                <View style={[s.iconBadge, leader && { backgroundColor: colors.accent }]}>
-                  <Text style={{ fontWeight: '800', fontSize: 18, color: leader ? '#fff' : colors.accent }}>{index + 1}</Text>
-                </View>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={s.title} numberOfLines={1}>
-                    {item.playerName}
-                  </Text>
-                  <Text style={s.subtitle}>
-                    {item.thru ? `${toParText(item.netToPar)} net · ` : ''}Thru {item.thru} · Gross {item.gross}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={s.label}>{stableford ? 'Pts' : 'Net'}</Text>
-                  <Text style={{ fontSize: 26, fontWeight: '800', color: colors.primary }}>
-                    {stableford ? item.points : item.net}
-                  </Text>
-                </View>
-                <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={icon.sm} color={colors.muted} />
-              </Pressable>
-              {expanded && (
-                <View style={{ marginTop: 8 }}>
-                  <Scorecard holes={holes} strokesFor={strokesFor(item.playerId)} />
-                </View>
-              )}
-            </View>
-          );
-        }}
+    <ScrollView style={s.screen} contentContainerStyle={s.content}>
+      {header}
+
+      <View style={[s.row, { marginTop: 4 }]}>
+        <Text style={[s.label, { flex: 1 }]}>{roundDone ? 'Final leaderboard' : 'Live leaderboard'}</Text>
+        {!stableford && <ModeToggle mode={mode} onChange={setMode} />}
+      </View>
+      <TvTable
+        title={`${round.name.toUpperCase()} · ${course.name.toUpperCase()}`}
+        columns={[
+          { label: stableford ? 'PTS' : 'TO PAR', width: 58 },
+          { label: 'THRU', width: 42 },
+          { label: 'GROSS', width: 50 },
+          { label: 'NET', width: 42 },
+        ]}
+        rows={boardRows}
+        renderExpanded={(id) => <Scorecard holes={holes} strokesFor={(n) => strokesOf(id, n)} />}
       />
-    </View>
+      <Text style={s.subtitle}>
+        {stableford ? 'Ranked by Stableford points.' : `Ranked by ${mode} score. TO PAR is ${mode} to par.`} THRU F = finished. Tap a player
+        for their scorecard.
+      </Text>
+
+      <Text style={[s.label, { marginTop: 12 }]}>Hole by hole (gross)</Text>
+      <HoleByHole holes={holes} players={roundPlayers} strokesFor={strokesOf} />
+
+      <Text style={[s.label, { marginTop: 12 }]}>Scoring stats</Text>
+      <ScoringStats holes={holes} players={roundPlayers} strokesFor={strokesOf} />
+
+      {roundDone && (
+        <View style={{ gap: 12, marginTop: 8 }}>
+          <PressableLink href={`/trip/${tripId}`} dismissTo style={s.button}>
+            <Ionicons name="home" size={icon.sm} color="#fff" />
+            <Text style={s.buttonText}>Back to trip</Text>
+          </PressableLink>
+          <PressableLink href="/" dismissTo style={s.buttonSecondary}>
+            <Text style={s.buttonTextSecondary}>All trips</Text>
+          </PressableLink>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 

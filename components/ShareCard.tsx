@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, Pressable, Platform, Share } from 'react-native';
+import { View, Text, Pressable, Platform, Share, Linking } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -26,13 +26,23 @@ export function ShareCard({ trip }: { trip: Trip }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+  const message = `Join ${trip.name} on the golf trip app: ${link}`;
   const share = async () => {
     try {
-      await Share.share({ message: `Join ${trip.name} on the golf trip app: ${link}`, url: link });
+      await Share.share({ message, url: link });
     } catch {
       await copy(); // browsers without a share sheet
     }
   };
+  // Opens the user's email app with the invite filled in (they add the addresses).
+  const email = () =>
+    Linking.openURL(
+      `mailto:?subject=${encodeURIComponent(`You're invited: ${trip.name}`)}&body=${encodeURIComponent(
+        `${message}
+
+Open the link, sign in with your email (you'll get a code), then pick which player you are.`
+      )}`
+    ).catch(copy);
 
   return (
     <View style={[s.card, { gap: 10 }]}>
@@ -58,6 +68,10 @@ export function ShareCard({ trip }: { trip: Trip }) {
           <Text style={s.buttonText}>Share</Text>
         </Pressable>
       </View>
+      <Pressable onPress={email} accessibilityRole="button" style={({ pressed }) => [s.buttonSecondary, pressed && s.pressed]}>
+        <Ionicons name="mail-outline" size={icon.sm} color={colors.accent} />
+        <Text style={s.buttonTextSecondary}>Email invite</Text>
+      </Pressable>
       <Pressable
         onPress={() => setShowQr((v) => !v)}
         accessibilityRole="button"

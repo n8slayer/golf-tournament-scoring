@@ -15,7 +15,7 @@ const HOLE_OPTIONS: { value: HolesPlayed; label: string }[] = [
 
 export default function NewRound() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, createRound, isOrganizer } = useTrips();
+  const { getTrip, createRound, canEdit } = useTrips();
   const trip = getTrip(tripId);
   const router = useRouter();
 
@@ -32,10 +32,10 @@ export default function NewRound() {
   const [slots, setSlots] = useState<Slots[] | null>(null); // null = draft-order defaults
 
   if (!trip) return null;
-  if (!isOrganizer(trip)) {
+  if (!canEdit(trip)) {
     return (
       <View style={[s.screen, s.content]}>
-        <Text style={s.subtitle}>Only the organizer can start new rounds.</Text>
+        <Text style={s.subtitle}>Only organizers can start new rounds.</Text>
       </View>
     );
   }

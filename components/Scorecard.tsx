@@ -7,14 +7,15 @@ const MARK = 24;
 
 // Tour-style score marks: double circle eagle or better, circle birdie,
 // plain par, square bogey, double square double bogey or worse.
-export function ScoreMark({ strokes, par }: { strokes?: number; par: number }) {
+// blank: draw only the shape (used by the legend).
+export function ScoreMark({ strokes, par, blank }: { strokes?: number; par: number; blank?: boolean }) {
   if (strokes === undefined) return <Text style={[st.score, { color: colors.border }]}>–</Text>;
   const diff = strokes - par;
   const round = diff < 0;
   const double = diff <= -2 || diff >= 2;
   const color = diff < 0 ? colors.under : colors.text;
   const shape = diff === 0 ? null : { borderWidth: 1.5, borderColor: color, borderRadius: round ? MARK : 2 };
-  const label = <Text style={[st.score, { color }]}>{strokes}</Text>;
+  const label = <Text style={[st.score, { color }]}>{blank ? '' : strokes}</Text>;
   if (!shape) return <View style={st.mark}>{label}</View>;
   return (
     <View style={[st.mark, shape]}>
@@ -76,7 +77,7 @@ export function Scorecard({ holes, strokesFor }: { holes: Hole[]; strokesFor: (n
           { strokes: 6, par: 4, label: 'Double+' },
         ].map((l) => (
           <View key={l.label} style={st.legendItem}>
-            <ScoreMark strokes={l.strokes} par={l.par} />
+            <ScoreMark strokes={l.strokes} par={l.par} blank />
             <Text style={st.legendText}>{l.label}</Text>
           </View>
         ))}

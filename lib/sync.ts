@@ -59,7 +59,7 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
   const ids = (rows ?? []).map((r) => r.id as string);
   const [scores, members] = await Promise.all([
     allScores(ids),
-    db.from('trip_members').select('trip_id, player_id').eq('user_id', userId),
+    db.from('trip_members').select('trip_id, player_id, role').eq('user_id', userId),
   ]);
   if (members.error) throw members.error;
   return (rows ?? []).map((r) =>
@@ -69,24 +69,51 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
       scores: scores
         .filter((s) => s.trip_id === r.id)
         .map((s) => ({ roundId: s.round_id, playerId: s.player_id, holeNumber: s.hole_number, strokes: s.strokes })),
-      sync: {
-        inviteCode: r.invite_code,
-        organizerId: r.organizer_id,
-        myPlayerId: members.data?.find((m) => m.trip_id === r.id)?.player_id ?? undefined,
-      },
+      sync: (() => {
+        const me = members.data?.find((m) => m.trip_id === r.id);
+        return {
+          inviteCode: r.invite_code,
+          organizerId: r.organizer_id,
+          myPlayerId: me?.player_id ?? undefined,
+          role: r.organizer_id === userId ? 'owner' : me?.role === 'admin' ? 'admin' : 'player',
+        } as const;
+      })(),
     })
   );
 }
 
-// Organizer only (RLS). Returns the server's invite code / organizer id.
+// New events are created (you become organizer); existing ones are updated, which RLS
+// allows for the organizer and co-organizers. Returns the server's invite code / organizer id.
 export async function pushTrip(trip: Trip): Promise<{ inviteCode: string; organizerId: string }> {
-  const { data, error } = await client()
-    .from('trips')
-    .upsert({ id: trip.id, data: tripData(trip) })
-    .select('invite_code, organizer_id')
-    .single();
+  const q = trip.sync
+    ? client().from('trips').update({ data: tripData(trip) }).eq('id', trip.id)
+    : client().from('trips').insert({ id: trip.id, data: tripData(trip) });
+  const { data, error } = await q.select('invite_code, organizer_id').single();
   if (error) throw error;
   return { inviteCode: data.invite_code, organizerId: data.organizer_id };
+}
+
+export interface Member {
+  user_id: string;
+  role: 'owner' | 'admin' | 'player';
+  player_id: string | null;
+  display_name: string | null;
+}
+
+export async function listMembers(tripId: string): Promise<Member[]> {
+  const { data, error } = await client().rpc('list_members', { t: tripId });
+  if (error) throw error;
+  return (data ?? []) as Member[];
+}
+
+export async function setMemberRole(tripId: string, userId: string, role: 'admin' | 'player'): Promise<void> {
+  const { error } = await client().rpc('set_member_role', { t: tripId, member: userId, new_role: role });
+  if (error) throw error;
+}
+
+export async function removeMember(tripId: string, userId: string): Promise<void> {
+  const { error } = await client().rpc('remove_member', { t: tripId, member: userId });
+  if (error) throw error;
 }
 
 export async function pushScore(tripId: string, s: Score): Promise<void> {

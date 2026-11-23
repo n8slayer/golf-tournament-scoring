@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadState, saveState, migrateTrip } from '../lib/storage';
-import { supabase, ensureUserId } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 import {
   fetchTrips,
   pushTrip,
@@ -43,7 +44,8 @@ interface TripsContextValue {
   offline: boolean;
   pending: number;
   getTrip: (tripId: string) => Trip | undefined;
-  isOrganizer: (trip: Trip) => boolean;
+  canEdit: (trip: Trip) => boolean; // organizer or co-organizer
+  isOwner: (trip: Trip) => boolean; // the organizer
   addTrip: (setup: TripSetup) => string;
   addPlayer: (tripId: string, name: string, handicapIndex: number) => void;
   updatePlayer: (tripId: string, playerId: string, patch: Partial<Player>) => void;
@@ -72,7 +74,8 @@ const TripsContext = createContext<TripsContextValue | undefined>(undefined);
 export function TripsProvider({ children }: { children: React.ReactNode }) {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [offline, setOffline] = useState(false);
   const [pending, setPending] = useState(0);
   const hasLoaded = useRef(false);
@@ -89,7 +92,8 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     setTrips(next);
   };
 
-  const isOrganizer = (trip: Trip) => !trip.sync || trip.sync.organizerId === userIdRef.current;
+  const isOwner = (trip: Trip) => !trip.sync || trip.sync.organizerId === userIdRef.current;
+  const canEdit = (trip: Trip) => isOwner(trip) || trip.sync?.role === 'admin';
 
   const persistQueue = () => {
     setPending(queue.current.length);
@@ -105,7 +109,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
         try {
           if (op.k === 'trip') {
             const trip = tripsRef.current.find((t) => t.id === op.tripId);
-            if (trip && isOrganizer(trip)) {
+            if (trip && canEdit(trip)) {
               const res = await pushTrip(trip);
               if (!trip.sync) commit((prev) => prev.map((t) => (t.id === trip.id ? { ...t, sync: res } : t)));
             }
@@ -187,30 +191,37 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
       setPending(queue.current.length);
       setLoaded(true);
       hasLoaded.current = true;
-      if (!supabase) return;
-
-      try {
-        const uid = await ensureUserId();
-        userIdRef.current = uid;
-        setUserId(uid);
-      } catch (e) {
-        setOffline(isNetworkError(e));
-        return;
-      }
-      // Trips made before sharing existed: give them a server id, then upload with their scores.
-      const unsynced = tripsRef.current.filter((t) => !t.sync);
-      if (unsynced.length) {
-        const renamed = new Map(unsynced.filter((t) => !isUuid(t.id)).map((t) => [t.id, uuid()]));
-        commit((prev) => prev.map((t) => (renamed.has(t.id) ? { ...t, id: renamed.get(t.id)! } : t)));
-        for (const t of unsynced) {
-          const id = renamed.get(t.id) ?? t.id;
-          enqueue({ k: 'trip', tripId: id });
-          for (const score of t.scores) enqueue({ k: 'score', tripId: id, score });
-        }
-      }
-      await refresh();
     })();
   }, []);
+
+  // Signed in (or switched account): upload trips that only exist here, then load ours.
+  // Signed out: forget this account's events on the device (shared phones).
+  const prevUser = useRef<string | null>(null);
+  useEffect(() => {
+    if (!loaded || !supabase) return;
+    userIdRef.current = userId;
+    if (!userId) {
+      if (prevUser.current) {
+        queue.current = [];
+        persistQueue();
+        commit(() => []);
+      }
+      prevUser.current = null;
+      return;
+    }
+    prevUser.current = userId;
+    const unsynced = tripsRef.current.filter((t) => !t.sync);
+    if (unsynced.length) {
+      const renamed = new Map(unsynced.filter((t) => !isUuid(t.id)).map((t) => [t.id, uuid()]));
+      commit((prev) => prev.map((t) => (renamed.has(t.id) ? { ...t, id: renamed.get(t.id)! } : t)));
+      for (const t of unsynced) {
+        const id = renamed.get(t.id) ?? t.id;
+        enqueue({ k: 'trip', tripId: id });
+        for (const score of t.scores) enqueue({ k: 'score', tripId: id, score });
+      }
+    }
+    refresh();
+  }, [userId, loaded]);
 
   // Live updates from other phones. Our own echoes are skipped (we already have them).
   useEffect(() => {
@@ -227,10 +238,12 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
         );
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trips' }, (payload) => {
-        const row = payload.new as { id: string; organizer_id: string; data: Trip };
-        if (row.organizer_id === userIdRef.current) return; // the organizer is the only writer
+        const row = payload.new as { id: string; updated_by?: string; data: Trip };
+        if (row.updated_by === userIdRef.current) return; // our own save echoing back
         commit((prev) => prev.map((t) => (t.id === row.id ? migrateTrip({ ...row.data, id: t.id, scores: t.scores, sync: t.sync }) : t)));
       })
+      // Someone was made co-organizer / removed: reload roles.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_members' }, () => refresh())
       .subscribe();
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active') refresh();
@@ -253,10 +266,10 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
 
   const getTrip = (tripId: string) => trips.find((t) => t.id === tripId);
 
-  // Settings changes: organizer only (the server enforces this too).
+  // Settings changes: organizer and co-organizers (the server enforces this too).
   const updateTrip = (tripId: string, updater: (trip: Trip) => Trip) => {
     const trip = tripsRef.current.find((t) => t.id === tripId);
-    if (!trip || !isOrganizer(trip)) return;
+    if (!trip || !canEdit(trip)) return;
     commit((prev) => prev.map((t) => (t.id === tripId ? updater(t) : t)));
     enqueue({ k: 'trip', tripId });
   };
@@ -371,9 +384,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const joinEvent = async (code: string) => {
-    const uid = userIdRef.current ?? (await ensureUserId());
-    userIdRef.current = uid;
-    setUserId(uid);
+    if (!userIdRef.current) throw new Error('Sign in with your email first');
     const id = await joinTrip(code);
     await refresh();
     return id;
@@ -400,7 +411,8 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
         offline,
         pending,
         getTrip,
-        isOrganizer,
+        canEdit,
+        isOwner,
         addTrip,
         addPlayer,
         updatePlayer,

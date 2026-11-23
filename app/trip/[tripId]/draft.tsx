@@ -7,7 +7,7 @@ import { formatHandicap } from '../../../lib/handicap';
 
 export default function Draft() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, ensureTeams, assignPlayerToTeam, renameTeam, isOrganizer } = useTrips();
+  const { getTrip, ensureTeams, assignPlayerToTeam, renameTeam, canEdit: canEditTrip } = useTrips();
   const trip = getTrip(tripId);
 
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function Draft() {
   }, [tripId, trip?.teams.length]);
 
   if (!trip) return null;
-  const canEdit = isOrganizer(trip);
+  const canEdit = canEditTrip(trip);
   if (trip.teams.length !== 2) {
     return canEdit ? null : (
       <View style={[s.screen, s.content]}>

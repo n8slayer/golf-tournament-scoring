@@ -151,7 +151,7 @@ export function MatchBoard({ trip }: { trip: Trip }) {
               trip={trip}
               round={round}
               pairing={pairing}
-              href={`/trip/${trip.id}/rounds/${round.id}/match`}
+              href={`/trip/${trip.id}/rounds/${round.id}/match?m=${i}`}
             />
           ))}
         </View>

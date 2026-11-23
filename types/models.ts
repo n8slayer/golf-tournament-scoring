@@ -79,7 +79,7 @@ export interface Trip {
   createdAt: string;
   event?: EventSettings; // missing on trips made before event setup
   // Set once the event is shared (stored in Supabase). Missing = only on this device.
-  sync?: { inviteCode: string; organizerId: string; myPlayerId?: string };
+  sync?: { inviteCode: string; organizerId: string; myPlayerId?: string; role?: 'owner' | 'admin' | 'player' };
   players: Player[];
   teams: Team[]; // 0 or 2 entries
   courses: Course[]; // at least one

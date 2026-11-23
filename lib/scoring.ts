@@ -125,14 +125,13 @@ export interface MatchStatus {
   resultLabel: string; // e.g. "2 up", "4&3", "AS"
 }
 
-export function matchStatus(trip: Trip, round: Round, pairing: MatchPairing): MatchStatus {
-  const holes = holeNumbersFor(round.holesPlayed);
+// Best ball: a side's score on a hole is its lowest net (singles = the one player).
+// The hole counts only once every player in the match has a score.
+function sideNetFn(trip: Trip, round: Round) {
   const scores = roundScoresFor(trip, round.id);
   const course = courseFor(trip, round);
   const allowance = allowanceFor(round);
-  // Best ball: a side's score on a hole is its lowest net (singles = the one player).
-  // The hole counts only once every player in the match has a score.
-  const sideNet = (ids: string[], holeNumber: number): number | null => {
+  return (ids: string[], holeNumber: number): number | null => {
     let best: number | null = null;
     for (const id of ids) {
       const player = getPlayer(trip, id);
@@ -143,6 +142,42 @@ export function matchStatus(trip: Trip, round: Round, pairing: MatchPairing): Ma
     }
     return best;
   };
+}
+
+// Strokes a player gets on a hole in this round's match play (allowance applied).
+export function matchStrokesOnHole(trip: Trip, round: Round, playerId: string, holeNumber: number): number {
+  const player = getPlayer(trip, playerId);
+  const hole = getHole(courseFor(trip, round), holeNumber);
+  if (!player || !hole) return 0;
+  const handicap = Math.round(courseHandicap(player.handicapIndex, courseFor(trip, round)) * allowanceFor(round));
+  return strokesReceivedOnHole(handicap, hole.strokeIndex);
+}
+
+export interface MatchHole {
+  holeNumber: number;
+  netA: number | null; // side's best net (null = not everyone has a score yet)
+  netB: number | null;
+  upAfter: number | null; // running status after this hole (+ = side A up); null once not played / match over
+}
+
+// Hole-by-hole view of a match, for the match scorecard.
+export function matchHoles(trip: Trip, round: Round, pairing: MatchPairing): MatchHole[] {
+  const holes = holeNumbersFor(round.holesPlayed);
+  const sideNet = sideNetFn(trip, round);
+  const decidedAfter = matchStatus(trip, round, pairing).through;
+  let up = 0;
+  return holes.map((holeNumber, i) => {
+    const netA = sideNet(pairing.sideA, holeNumber);
+    const netB = sideNet(pairing.sideB, holeNumber);
+    if (i >= decidedAfter || netA === null || netB === null) return { holeNumber, netA, netB, upAfter: null };
+    up += netA < netB ? 1 : netB < netA ? -1 : 0;
+    return { holeNumber, netA, netB, upAfter: up };
+  });
+}
+
+export function matchStatus(trip: Trip, round: Round, pairing: MatchPairing): MatchStatus {
+  const holes = holeNumbersFor(round.holesPlayed);
+  const sideNet = sideNetFn(trip, round);
   let holesUp = 0;
   let through = 0;
   let closedOut = false;
@@ -454,6 +489,11 @@ function selfCheck() {
   console.assert(st[0].playerId === 'p1', 'standings: stroke play leader has lowest net to par');
   const stb = tripStandings({ ...two, event: { type: 'stableford', skinValue: 0, matchStake: 0 } });
   console.assert(stb[0].points >= stb[1].points, 'standings: stableford sorts by points');
+
+  // Match scorecard agrees with the match status: four-ball hole 1 → A 1 up, rest unplayed.
+  const mh = matchHoles(trip, fb, fb.matches![0]);
+  console.assert(mh[0].upAfter === 1 && mh[0].netA === 3 && mh[0].netB === 4 && mh[1].upAfter === null, 'match holes: hole 1 A up, hole 2 not played');
+  console.assert(matchStrokesOnHole(trip, fb, 'p1', 1) === 0, 'match holes: scratch gets no strokes');
 
   const settlement = computeSettlement(trip);
   const net = settlement.reduce((sum, l) => sum + l.amount, 0) - settlement.reduce((sum, l) => sum + l.amount, 0);

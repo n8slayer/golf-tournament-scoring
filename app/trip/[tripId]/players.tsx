@@ -7,10 +7,10 @@ import { courseHandicap, formatHandicap } from '../../../lib/handicap';
 
 export default function Players() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { getTrip, addPlayer, removePlayer, isOrganizer } = useTrips();
+  const { getTrip, addPlayer, removePlayer, canEdit: canEditTrip } = useTrips();
   const trip = getTrip(tripId);
   if (!trip) return null;
-  const canEdit = isOrganizer(trip);
+  const canEdit = canEditTrip(trip);
 
   return (
     <View style={s.screen}>
@@ -22,7 +22,7 @@ export default function Players() {
           canEdit ? (
             <PlayerForm onAdd={(name, index) => addPlayer(tripId, name, index)} />
           ) : (
-            <Text style={s.subtitle}>Only the organizer can change the roster.</Text>
+            <Text style={s.subtitle}>Only organizers can change the roster.</Text>
           )
         }
         ListEmptyComponent={<Text style={s.subtitle}>No players yet.</Text>}
