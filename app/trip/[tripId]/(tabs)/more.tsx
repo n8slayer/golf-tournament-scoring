@@ -20,6 +20,20 @@ export default function MoreTab() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
+      {user && (
+        <View style={[s.card, s.row]}>
+          <Ionicons name="person-circle" size={icon.lg} color={colors.accent} />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.title, { fontSize: 16 }]}>{displayName ?? 'Signed in'}</Text>
+            <Text style={s.subtitle} numberOfLines={1}>
+              {user.email}
+            </Text>
+          </View>
+          <Pressable onPress={signOut} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Text style={s.linkText}>Sign out</Text>
+          </Pressable>
+        </View>
+      )}
       <ShareCard trip={trip} />
 
       <Text style={[s.label, { marginTop: 8 }]}>This event</Text>
@@ -40,20 +54,6 @@ export default function MoreTab() {
 
       <Text style={[s.label, { marginTop: 8 }]}>App</Text>
       <NavCard href="/events" icon="swap-horizontal" title="All events" subtitle="Switch event, join or create another" />
-      {user && (
-        <View style={[s.card, s.row]}>
-          <Ionicons name="person-circle" size={icon.lg} color={colors.accent} />
-          <View style={{ flex: 1 }}>
-            <Text style={[s.title, { fontSize: 16 }]}>{displayName ?? 'Signed in'}</Text>
-            <Text style={s.subtitle} numberOfLines={1}>
-              {user.email}
-            </Text>
-          </View>
-          <Pressable onPress={signOut} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
-            <Text style={s.linkText}>Sign out</Text>
-          </Pressable>
-        </View>
-      )}
     </ScrollView>
   );
 }
