@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, Redirect } from 'expo-router';
 import { headerOptions } from '../../../lib/styles';
 import { useTrips } from '../../../context/TripsContext';
 import { PartyAlert } from '../../../components/PartyAlert';
+import { HeaderLeft } from '../../../components/HeaderLeft';
 
 // An event: the tab bar (Home · Score · Leaderboard · More) plus pages opened from it.
 export default function TripLayout() {
@@ -13,7 +14,7 @@ export default function TripLayout() {
 
   return (
     <>
-      <Stack screenOptions={headerOptions}>
+      <Stack screenOptions={{ ...headerOptions, headerLeft: () => <HeaderLeft /> }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="players" options={{ title: 'Players' }} />
         <Stack.Screen name="course" options={{ title: 'Courses' }} />

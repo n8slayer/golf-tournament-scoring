@@ -6,6 +6,7 @@ import { headerOptions, s, colors } from '../lib/styles';
 import { TripsProvider } from '../context/TripsContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { UpdateBanner } from '../components/UpdateBanner';
+import { HeaderLeft } from '../components/HeaderLeft';
 import '../lib/webInteractions';
 
 // Everyone signs in (email code) before using shared events; the page they were going to
@@ -13,14 +14,15 @@ import '../lib/webInteractions';
 function AuthGate() {
   const { required, loading, user, displayName, profileLoaded } = useAuth();
   const pathname = usePathname();
-  const needsSignIn =
-    required && !loading && pathname !== '/sign-in' && (!user || (profileLoaded && !displayName));
+  const needsSignIn = required && !loading && pathname !== '/sign-in' && (!user || (profileLoaded && !displayName));
   useEffect(() => {
     if (needsSignIn) router.replace(`/sign-in?next=${encodeURIComponent(pathname)}`);
   }, [needsSignIn, pathname]);
   if (!required || !loading) return null;
   return (
-    <View style={[s.screen, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }]}>
+    <View
+      style={[s.screen, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }]}
+    >
       <ActivityIndicator color={colors.accent} />
     </View>
   );
@@ -38,7 +40,11 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       <Pressable onPress={retry} accessibilityRole="button" style={({ pressed }) => [s.button, pressed && s.pressed]}>
         <Text style={s.buttonText}>Try again</Text>
       </Pressable>
-      <Pressable onPress={() => router.replace('/events')} accessibilityRole="button" style={({ pressed }) => [s.buttonSecondary, pressed && s.pressed]}>
+      <Pressable
+        onPress={() => router.replace('/events')}
+        accessibilityRole="button"
+        style={({ pressed }) => [s.buttonSecondary, pressed && s.pressed]}
+      >
         <Text style={s.buttonTextSecondary}>Go to your events</Text>
       </Pressable>
     </View>
@@ -49,7 +55,7 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <TripsProvider>
-        <Stack screenOptions={headerOptions}>
+        <Stack screenOptions={{ ...headerOptions, headerLeft: () => <HeaderLeft /> }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="events" options={{ title: 'Your events' }} />
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />

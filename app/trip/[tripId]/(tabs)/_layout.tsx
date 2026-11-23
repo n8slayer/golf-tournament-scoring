@@ -5,9 +5,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../../../../context/TripsContext';
 import { setLastTripId } from '../../../../lib/storage';
 import { colors } from '../../../../lib/styles';
+import { AllEventsButton } from '../../../../components/HeaderLeft';
 
 type IconName = keyof typeof Ionicons.glyphMap;
-const icon = (name: IconName) => ({ color, size }: { color: ColorValue; size: number }) => <Ionicons name={name} size={size} color={color as string} />;
+const icon =
+  (name: IconName) =>
+  ({ color, size }: { color: ColorValue; size: number }) => <Ionicons name={name} size={size} color={color as string} />;
 
 // Bottom tab bar inside an event.
 export default function EventTabs() {
@@ -34,7 +37,10 @@ export default function EventTabs() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: trip?.name ?? 'Event', tabBarLabel: 'Home', tabBarIcon: icon('home') }} />
+      <Tabs.Screen
+        name="index"
+        options={{ title: trip?.name ?? 'Event', headerLeft: () => <AllEventsButton />, tabBarLabel: 'Home', tabBarIcon: icon('home') }}
+      />
       <Tabs.Screen name="score" options={{ title: 'Score', tabBarIcon: icon('create') }} />
       <Tabs.Screen name="leaderboard" options={{ title: 'Leaderboard', tabBarIcon: icon('podium') }} />
       <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: icon('ellipsis-horizontal') }} />
