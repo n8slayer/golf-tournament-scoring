@@ -47,7 +47,7 @@ export function MatchCard({ trip, round, pairing, href }: { trip: Trip; round: R
       <View style={st_.row}>
         <View style={[st_.side, { borderLeftColor: colors.teamA, borderLeftWidth: 4, paddingLeft: 8 }]}>
           {pairing.sideA.map((id) => (
-            <Text key={id} style={[st_.name, { color: colors.teamA }]} numberOfLines={1}>
+            <Text key={id} style={[st_.name, { color: colors.teamAText }]} numberOfLines={1}>
               {nameOf(id)}
             </Text>
           ))}
@@ -55,7 +55,7 @@ export function MatchCard({ trip, round, pairing, href }: { trip: Trip; round: R
         </View>
         <View style={st_.center}>
           <View style={[st_.status, leaderColor ? { backgroundColor: leaderColor } : { backgroundColor: colors.accentSoft }]}>
-            <Text style={[st_.statusBig, { color: leaderColor ? '#fff' : colors.primary }]}>{big}</Text>
+            <Text style={[st_.statusBig, { color: leaderColor ? colors.onTeam : colors.text }]}>{big}</Text>
           </View>
           <Text style={st_.statusSmall}>{small}</Text>
         </View>
@@ -63,7 +63,7 @@ export function MatchCard({ trip, round, pairing, href }: { trip: Trip; round: R
           style={[st_.side, { alignItems: 'flex-end', borderRightColor: colors.teamB, borderRightWidth: 4, paddingRight: 8 }]}
         >
           {pairing.sideB.map((id) => (
-            <Text key={id} style={[st_.name, { color: colors.teamB, textAlign: 'right' }]} numberOfLines={1}>
+            <Text key={id} style={[st_.name, { color: colors.teamBText, textAlign: 'right' }]} numberOfLines={1}>
               {nameOf(id)}
             </Text>
           ))}
@@ -114,15 +114,14 @@ export function SessionHeader({ trip, round }: { trip: Trip; round: Round }) {
 }
 
 // Team score header + every round's matches. Renders nothing until teams and matches exist.
-export function MatchBoard({ trip }: { trip: Trip }) {
+// Team score header (Team A n – n Team B, points to win). Shown even before any matches exist.
+export function TeamScoreHeader({ trip }: { trip: Trip }) {
   const [teamA, teamB] = trip.teams;
-  const rounds = trip.rounds.filter((r) => r.matchEnabled && matchPairings(trip, r).length > 0);
-  if (!teamA || !teamB || rounds.length === 0) return null;
+  if (!teamA || !teamB) return null;
   const tp = teamPoints(trip);
-  const winner = tp.a >= tp.toWin ? teamA : tp.b >= tp.toWin ? teamB : null;
-
+  const winner = tp.totalAvailable > 0 && (tp.a >= tp.toWin ? teamA : tp.b >= tp.toWin ? teamB : null);
   return (
-    <View style={{ gap: 12 }}>
+    <View style={{ gap: 8 }}>
       <View style={st_.scoreRow} accessible accessibilityLabel={`${teamA.name} ${fmtPts(tp.a)}, ${teamB.name} ${fmtPts(tp.b)}`}>
         <View style={[st_.team, { backgroundColor: colors.teamA }]}>
           <Text style={st_.teamName} numberOfLines={1}>
@@ -139,8 +138,24 @@ export function MatchBoard({ trip }: { trip: Trip }) {
         </View>
       </View>
       <Text style={[s.subtitle, { textAlign: 'center', fontWeight: '700' }]}>
-        {winner ? `${winner.name} have won the cup!` : `${fmtPts(tp.toWin)} pts to win the cup`}
+        {winner
+          ? `${winner.name} have won the cup!`
+          : tp.totalAvailable
+            ? `${fmtPts(tp.toWin)} pts to win the cup`
+            : 'No matches yet. Points appear once rounds with match play start.'}
       </Text>
+    </View>
+  );
+}
+
+export function MatchBoard({ trip }: { trip: Trip }) {
+  const [teamA, teamB] = trip.teams;
+  const rounds = trip.rounds.filter((r) => r.matchEnabled && matchPairings(trip, r).length > 0);
+  if (!teamA || !teamB || rounds.length === 0) return null;
+
+  return (
+    <View style={{ gap: 12 }}>
+      <TeamScoreHeader trip={trip} />
 
       {rounds.map((round) => (
         <View key={round.id} style={{ gap: 8, marginTop: 4 }}>
@@ -171,7 +186,7 @@ const st_ = StyleSheet.create({
   statusSmall: { fontSize: 12, color: colors.muted, fontWeight: '600' },
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   team: { flex: 1, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center' },
-  teamName: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  teamPts: { color: '#fff', fontSize: 40, fontWeight: '800', lineHeight: 46 },
+  teamName: { color: colors.onTeam, fontSize: 15, fontWeight: '700' },
+  teamPts: { color: colors.onTeam, fontSize: 40, fontWeight: '800', lineHeight: 46 },
   vs: { color: colors.muted, fontWeight: '700' },
 });

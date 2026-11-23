@@ -76,7 +76,7 @@ export default function People() {
                 <Ionicons
                   name={m.role === 'owner' ? 'star' : m.role === 'admin' ? 'shield-checkmark' : 'person'}
                   size={icon.md}
-                  color={m.role !== 'player' ? '#fff' : colors.accent}
+                  color={m.role !== 'player' ? colors.onAccent : colors.accent}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -108,7 +108,7 @@ export default function People() {
                   accessibilityRole="button"
                   style={({ pressed }) => [s.pill, { borderColor: colors.danger }, confirmRemove === m.user_id && { backgroundColor: colors.danger }, pressed && s.pressed]}
                 >
-                  <Text style={[s.pillText, { color: confirmRemove === m.user_id ? '#fff' : colors.danger }]}>
+                  <Text style={[s.pillText, { color: confirmRemove === m.user_id ? colors.onAccent : colors.danger }]}>
                     {confirmRemove === m.user_id ? 'Tap again to remove' : 'Remove from event'}
                   </Text>
                 </Pressable>

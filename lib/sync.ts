@@ -111,6 +111,13 @@ export async function setMemberRole(tripId: string, userId: string, role: 'admin
   if (error) throw error;
 }
 
+// Organizer only: switch the event to a new short code (old links stop working).
+export async function regenerateCode(tripId: string): Promise<string> {
+  const { data, error } = await client().rpc('regenerate_code', { t: tripId });
+  if (error) throw error;
+  return data as string;
+}
+
 export async function removeMember(tripId: string, userId: string): Promise<void> {
   const { error } = await client().rpc('remove_member', { t: tripId, member: userId });
   if (error) throw error;

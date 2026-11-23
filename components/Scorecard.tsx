@@ -89,8 +89,8 @@ export function Scorecard({ holes, strokesFor }: { holes: Hole[]; strokesFor: (n
 const st = StyleSheet.create({
   table: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 34 },
-  headRow: { backgroundColor: colors.primary },
-  headText: { color: '#fff', fontWeight: '700' },
+  headRow: { backgroundColor: colors.headBar },
+  headText: { color: colors.text, fontWeight: '700' },
   rowLabel: { width: 44, paddingLeft: 6, fontSize: 12, fontWeight: '700', color: colors.muted },
   cell: { flex: 1, minWidth: CELL - 6, textAlign: 'center', fontSize: 13 },
   cellBox: { flex: 1, minWidth: CELL - 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 3 },

@@ -42,6 +42,11 @@ function selfCheck() {
 }
 selfCheck();
 
+// The event you last opened, so the app can reopen it on launch.
+const LAST_TRIP_KEY = 'golf-trip-app:lastTrip';
+export const getLastTripId = () => AsyncStorage.getItem(LAST_TRIP_KEY).catch(() => null);
+export const setLastTripId = (id: string) => AsyncStorage.setItem(LAST_TRIP_KEY, id).catch(() => {});
+
 export async function saveState(state: AppState): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(state));
 }

@@ -122,7 +122,7 @@ export default function NewTrip() {
               style={({ pressed }) => [s.card, s.row, { justifyContent: 'flex-start' }, active && st.active, pressed && s.pressed]}
             >
               <View style={[s.iconBadge, active && { backgroundColor: colors.accent }]}>
-                <Ionicons name={e.icon} size={icon.md} color={active ? '#fff' : colors.accent} />
+                <Ionicons name={e.icon} size={icon.md} color={active ? colors.onAccent : colors.accent} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={s.title}>{e.title}</Text>
@@ -208,7 +208,7 @@ export default function NewTrip() {
                       accessibilityLabel={`${p.name} on ${teamNames[t] || `team ${t + 1}`}`}
                       style={[s.pill, { borderColor: color }, active && { backgroundColor: color }]}
                     >
-                      <Text style={[s.pillText, { color: active ? '#fff' : color }]}>{teamNames[t] || `Team ${t + 1}`}</Text>
+                      <Text style={[s.pillText, { color: active ? colors.onTeam : t ? colors.teamBText : colors.teamAText }]}>{teamNames[t] || `Team ${t + 1}`}</Text>
                     </Pressable>
                   );
                 })}
@@ -249,8 +249,8 @@ export default function NewTrip() {
 }
 
 const st = StyleSheet.create({
-  step: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  stepText: { color: '#fff', fontWeight: '800' },
+  step: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  stepText: { color: colors.onAccent, fontWeight: '800' },
   active: { borderColor: colors.accent, borderWidth: 2 },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

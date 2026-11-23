@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { Stack, router, usePathname } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { headerOptions, s, colors } from '../lib/styles';
 import { TripsProvider } from '../context/TripsContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -28,13 +29,15 @@ export default function RootLayout() {
     <AuthProvider>
       <TripsProvider>
         <Stack screenOptions={headerOptions}>
-          <Stack.Screen name="index" options={{ title: 'Golf Trips' }} />
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="events" options={{ title: 'Your events' }} />
           <Stack.Screen name="sign-in" options={{ title: 'Sign in', headerBackVisible: false }} />
           <Stack.Screen name="trip/new" options={{ title: 'New Event' }} />
           <Stack.Screen name="join/[code]" options={{ title: 'Join event' }} />
           <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
         </Stack>
         <AuthGate />
+        <StatusBar style="light" />
       </TripsProvider>
     </AuthProvider>
   );

@@ -84,7 +84,7 @@ export function CourseSearch({ onAdd, title = 'Add a course' }: { onAdd: (course
           accessibilityRole="button"
           accessibilityLabel="Search"
         >
-          <Ionicons name="search" size={icon.sm} color="#fff" />
+          <Ionicons name="search" size={icon.sm} color={colors.onAccent} />
         </Pressable>
       </View>
       {busy && <ActivityIndicator color={colors.accent} />}

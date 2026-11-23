@@ -5,7 +5,7 @@ import { useTrips } from '../../../../../context/TripsContext';
 import { holeNumbersFor } from '../../../../../lib/holeRanges';
 import { courseFor } from '../../../../../lib/scoring';
 import { NavCard, PressableLink } from '../../../../../components/NavCard';
-import { s, icon } from '../../../../../lib/styles';
+import { s, icon, colors } from '../../../../../lib/styles';
 
 export default function RoundHome() {
   const { tripId, roundId } = useLocalSearchParams<{ tripId: string; roundId: string }>();
@@ -26,7 +26,7 @@ export default function RoundHome() {
       </Text>
 
       <PressableLink href={`${base}/score`} style={[s.button, { minHeight: 56 }]}>
-          <Ionicons name="create-outline" size={icon.md} color="#fff" />
+          <Ionicons name="create-outline" size={icon.md} color={colors.onAccent} />
           <Text style={s.buttonText}>{entered ? 'Keep scoring' : 'Start scoring'}</Text>
         </PressableLink>
 

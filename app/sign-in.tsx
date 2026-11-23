@@ -153,7 +153,7 @@ export default function SignIn() {
             accessibilityLabel="Your name"
           />
           <Pressable style={({ pressed }) => [s.button, busy && s.disabled, pressed && s.pressed]} onPress={submitName} disabled={busy} accessibilityRole="button">
-            <Ionicons name="checkmark" size={icon.sm} color="#fff" />
+            <Ionicons name="checkmark" size={icon.sm} color={colors.onAccent} />
             <Text style={s.buttonText}>Continue</Text>
           </Pressable>
         </>

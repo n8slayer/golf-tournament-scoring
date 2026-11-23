@@ -47,9 +47,10 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
     );
     const netRow = (side: 'A' | 'B') => {
       const color = side === 'A' ? colors.teamA : colors.teamB;
+      const textColor = side === 'A' ? colors.teamAText : colors.teamBText;
       return (
         <View style={[st.row, st.netRow]}>
-          <Text style={[st.label, { color }]} numberOfLines={1}>
+          <Text style={[st.label, { color: textColor }]} numberOfLines={1}>
             {fourball ? 'Best net' : 'Net'}
           </Text>
           {hs.map((h) => {
@@ -58,7 +59,7 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
             const theirs = side === 'A' ? x?.netB : x?.netA;
             const won = mine != null && theirs != null && mine < theirs;
             return (
-              <Text key={h.number} style={[st.cell, won && { color: '#fff', backgroundColor: color, fontWeight: '800' }]}>
+              <Text key={h.number} style={[st.cell, won && { color: colors.onTeam, backgroundColor: color, fontWeight: '800' }]}>
                 {mine ?? '–'}
               </Text>
             );
@@ -96,7 +97,7 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
           ))}
           <Text style={st.total} />
         </View>
-        {pairing.sideA.map((pid) => playerRow(pid, colors.teamA))}
+        {pairing.sideA.map((pid) => playerRow(pid, colors.teamAText))}
         {netRow('A')}
         <View style={[st.row, st.matchRow]}>
           <Text style={[st.label, { fontWeight: '800' }]}>Match</Text>
@@ -106,7 +107,7 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
             return (
               <View key={h.number} style={st.cellBox}>
                 {up != null && (
-                  <Text style={[st.status, bg ? { backgroundColor: bg, color: '#fff' } : { color: colors.muted }]}>
+                  <Text style={[st.status, bg ? { backgroundColor: bg, color: colors.onTeam } : { color: colors.muted }]}>
                     {up === 0 ? 'AS' : Math.abs(up)}
                   </Text>
                 )}
@@ -116,7 +117,7 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
           <Text style={st.total} />
         </View>
         {netRow('B')}
-        {pairing.sideB.map((pid) => playerRow(pid, colors.teamB))}
+        {pairing.sideB.map((pid) => playerRow(pid, colors.teamBText))}
       </View>
     );
   };
@@ -136,15 +137,15 @@ export function MatchScorecard({ trip, round, pairing }: { trip: Trip; round: Ro
 const st = StyleSheet.create({
   table: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.card },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: 32 },
-  head: { backgroundColor: colors.primary },
-  headText: { color: '#fff', fontWeight: '700' },
+  head: { backgroundColor: colors.headBar },
+  headText: { color: colors.text, fontWeight: '700' },
   label: { width: 64, paddingLeft: 6, fontSize: 12, fontWeight: '700', color: colors.muted },
   cell: { flex: 1, minWidth: 22, textAlign: 'center', fontSize: 13, color: colors.text, paddingVertical: 4 },
   cellBox: { flex: 1, minWidth: 22, alignItems: 'center', justifyContent: 'center', paddingVertical: 3 },
   total: { width: 34, textAlign: 'center', fontSize: 13, color: colors.text },
   muted: { color: colors.muted },
-  netRow: { backgroundColor: '#F4F8F5' },
-  matchRow: { backgroundColor: '#FBF4E2' },
+  netRow: { backgroundColor: colors.zebra },
+  matchRow: { backgroundColor: colors.leadRow },
   status: { minWidth: 22, textAlign: 'center', fontSize: 11, fontWeight: '800', borderRadius: 4, paddingVertical: 2, overflow: 'hidden' },
   dots: { position: 'absolute', top: 1, right: 0, flexDirection: 'row', gap: 1 },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.text },

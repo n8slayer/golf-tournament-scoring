@@ -53,12 +53,12 @@ export function StandingsBoard({ trip }: { trip: Trip }) {
         <Text style={{ color: colors.sand, fontSize: 12, fontWeight: '800', letterSpacing: 2 }}>
           {stableford ? 'STABLEFORD' : 'STROKE PLAY'} · {trip.rounds.length} ROUND{trip.rounds.length === 1 ? '' : 'S'}
         </Text>
-        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>
+        <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800' }}>
           {leaders.length
             ? `${leaders.map((l) => l.name).join(' & ')} ${leaders.length > 1 ? 'lead' : 'leads'} · ${leaders[0].cells[0].text}${stableford ? ' pts' : ''}`
             : 'No scores yet'}
         </Text>
-        <Text style={{ color: '#E6F0EA' }}>
+        <Text style={{ color: colors.muted }}>
           {stableford ? 'Most points across all rounds wins.' : `Lowest total ${mode} to par across all rounds wins.`}
         </Text>
       </View>

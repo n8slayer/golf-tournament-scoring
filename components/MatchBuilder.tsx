@@ -56,7 +56,7 @@ export function MatchBuilder({
               accessibilityLabel={`Match ${mi + 1}: ${p.name}${taken ? ', already playing' : ''}`}
               style={[s.pill, { borderColor: color }, active && { backgroundColor: color }, taken && s.disabled]}
             >
-              <Text style={[s.pillText, { color: active ? '#fff' : color }]}>{p.name}</Text>
+              <Text style={[s.pillText, { color: active ? colors.onTeam : color === colors.teamA ? colors.teamAText : colors.teamBText }]}>{p.name}</Text>
             </Pressable>
           );
         })}
@@ -97,9 +97,9 @@ export function MatchBuilder({
               <Ionicons name="close" size={icon.md} color={colors.muted} />
             </Pressable>
           </View>
-          <Text style={[s.label, { color: colors.teamA }]}>{teamA.name}</Text>
+          <Text style={[s.label, { color: colors.teamAText }]}>{teamA.name}</Text>
           {Array.from({ length: size }, (_, si) => slotRow(mi, 'sideA', si, teamA.id, colors.teamA))}
-          <Text style={[s.label, { color: colors.teamB }]}>{teamB.name}</Text>
+          <Text style={[s.label, { color: colors.teamBText }]}>{teamB.name}</Text>
           {Array.from({ length: size }, (_, si) => slotRow(mi, 'sideB', si, teamB.id, colors.teamB))}
         </View>
       ))}

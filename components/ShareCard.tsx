@@ -5,6 +5,8 @@ import QRCode from 'react-native-qrcode-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { s, colors, icon } from '../lib/styles';
 import { Trip } from '../types/models';
+import { useTrips } from '../context/TripsContext';
+import { regenerateCode } from '../lib/sync';
 
 // Native builds have no page origin; set EXPO_PUBLIC_SITE_URL to the production web address.
 const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL ?? 'https://golf-tournament-scoring-jet.vercel.app';
@@ -18,6 +20,8 @@ export function joinLink(code: string): string {
 export function ShareCard({ trip }: { trip: Trip }) {
   const [showQr, setShowQr] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const { isOwner, refresh } = useTrips();
   if (!trip.sync) return null;
   const link = joinLink(trip.sync.inviteCode);
 
@@ -52,9 +56,16 @@ Open the link, sign in with your email (you'll get a code), then pick which play
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.title}>Invite players</Text>
-          <Text style={s.subtitle}>Anyone with this link can join and enter scores.</Text>
+          <Text style={s.subtitle}>Share the code or the link. Anyone with it can join and enter scores.</Text>
         </View>
       </View>
+      <Text
+        style={{ color: colors.accent, fontSize: 26, fontWeight: '800', letterSpacing: 6, textAlign: 'center' }}
+        selectable
+        accessibilityLabel={`Join code ${trip.sync.inviteCode.toUpperCase().split('').join(' ')}`}
+      >
+        {trip.sync.inviteCode.toUpperCase()}
+      </Text>
       <Text style={[s.subtitle, { fontFamily: Platform.OS === 'web' ? 'monospace' : undefined }]} selectable numberOfLines={1}>
         {link}
       </Text>
@@ -64,7 +75,7 @@ Open the link, sign in with your email (you'll get a code), then pick which play
           <Text style={s.buttonTextSecondary}>{copied ? 'Copied' : 'Copy link'}</Text>
         </Pressable>
         <Pressable onPress={share} accessibilityRole="button" style={({ pressed }) => [s.button, { flex: 1 }, pressed && s.pressed]}>
-          <Ionicons name="share-outline" size={icon.sm} color="#fff" />
+          <Ionicons name="share-outline" size={icon.sm} color={colors.onAccent} />
           <Text style={s.buttonText}>Share</Text>
         </Pressable>
       </View>
@@ -72,6 +83,25 @@ Open the link, sign in with your email (you'll get a code), then pick which play
         <Ionicons name="mail-outline" size={icon.sm} color={colors.accent} />
         <Text style={s.buttonTextSecondary}>Email invite</Text>
       </Pressable>
+      {isOwner(trip) && trip.sync.inviteCode.length !== 6 && (
+        <Pressable
+          disabled={busy}
+          onPress={async () => {
+            setBusy(true);
+            try {
+              await regenerateCode(trip.id);
+              await refresh();
+            } finally {
+              setBusy(false);
+            }
+          }}
+          accessibilityRole="button"
+          style={({ pressed }) => [s.buttonSecondary, busy && s.disabled, pressed && s.pressed]}
+        >
+          <Ionicons name="key-outline" size={icon.sm} color={colors.accent} />
+          <Text style={s.buttonTextSecondary}>Get a short code (old link stops working)</Text>
+        </Pressable>
+      )}
       <Pressable
         onPress={() => setShowQr((v) => !v)}
         accessibilityRole="button"

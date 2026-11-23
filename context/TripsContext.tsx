@@ -39,6 +39,7 @@ const sameScore = (a: Score, b: Score) =>
 interface TripsContextValue {
   trips: Trip[];
   loaded: boolean;
+  synced: boolean; // first server load finished (or not sharing / failed)
   sharing: boolean; // Supabase configured
   userId: string | null;
   offline: boolean;
@@ -74,6 +75,7 @@ const TripsContext = createContext<TripsContextValue | undefined>(undefined);
 export function TripsProvider({ children }: { children: React.ReactNode }) {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [synced, setSynced] = useState(!supabase);
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [offline, setOffline] = useState(false);
@@ -176,6 +178,8 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       if (isNetworkError(e)) setOffline(true);
       else console.warn('Refresh failed:', (e as Error)?.message ?? JSON.stringify(e));
+    } finally {
+      setSynced(true);
     }
   };
 
@@ -406,6 +410,7 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
       value={{
         trips,
         loaded,
+        synced,
         sharing: !!supabase,
         userId,
         offline,

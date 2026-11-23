@@ -163,11 +163,11 @@ export default function Leaderboard() {
       {roundDone && (
         <View style={{ gap: 12, marginTop: 8 }}>
           <PressableLink href={`/trip/${tripId}`} dismissTo style={s.button}>
-            <Ionicons name="home" size={icon.sm} color="#fff" />
+            <Ionicons name="home" size={icon.sm} color={colors.onAccent} />
             <Text style={s.buttonText}>Back to trip</Text>
           </PressableLink>
-          <PressableLink href="/" dismissTo style={s.buttonSecondary}>
-            <Text style={s.buttonTextSecondary}>All trips</Text>
+          <PressableLink href="/events" style={s.buttonSecondary}>
+            <Text style={s.buttonTextSecondary}>All events</Text>
           </PressableLink>
         </View>
       )}
@@ -188,5 +188,5 @@ const st = StyleSheet.create({
   },
   bannerLabel: { color: colors.sand, fontSize: 12, fontWeight: '800', letterSpacing: 2 },
   bannerName: { color: '#fff', fontSize: 26, fontWeight: '800' },
-  bannerMeta: { color: '#E6F0EA', fontSize: 15, fontWeight: '600' },
+  bannerMeta: { color: colors.text, fontSize: 15, fontWeight: '600' },
 });
