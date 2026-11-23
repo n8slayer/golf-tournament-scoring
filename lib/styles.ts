@@ -1,0 +1,67 @@
+import { StyleSheet } from 'react-native';
+
+export const colors = {
+  bg: '#0b3d2e',
+  card: '#ffffff',
+  accent: '#1b7a43',
+  accentDark: '#0e5a30',
+  text: '#0b3d2e',
+  muted: '#6b7b73',
+  danger: '#b3261e',
+  border: '#dbe7df',
+};
+
+export const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#f4f8f5' },
+  content: { padding: 16, gap: 12 },
+  title: { fontSize: 22, fontWeight: '700', color: colors.text },
+  subtitle: { fontSize: 15, color: colors.muted },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 6,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  label: { fontSize: 13, color: colors.muted, fontWeight: '600' },
+  button: {
+    backgroundColor: colors.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  buttonSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  buttonTextSecondary: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+  linkText: { color: colors.accent, fontWeight: '600' },
+  pillRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  pill: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  pillActive: { backgroundColor: colors.accent },
+  pillText: { color: colors.accent, fontWeight: '600' },
+  pillTextActive: { color: '#fff', fontWeight: '600' },
+});
