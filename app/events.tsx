@@ -9,6 +9,7 @@ import { JoinCodeCard } from '../components/JoinCodeCard';
 import { NewEventDialog } from '../components/NewEventDialog';
 import { eventOf } from '../lib/scoring';
 import { s, colors, icon } from '../lib/styles';
+import { DEMO_CODE } from '../lib/sync';
 import { Trip } from '../types/models';
 
 const FORMAT = { rydercup: 'RYDER CUP', strokeplay: 'STROKE PLAY', stableford: 'STABLEFORD' } as const;
@@ -88,6 +89,15 @@ export default function MyEvents() {
         <Ionicons name="add" size={icon.sm} color={colors.accent} />
         <Text style={s.buttonTextSecondary}>Create new event</Text>
       </Pressable>
+      {!sorted.some((t) => t.sync?.inviteCode === DEMO_CODE) && (
+        <PressableLink
+          href={`/join/${DEMO_CODE}`}
+          style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+          label="Try the demo event"
+        >
+          <Text style={s.linkText}>Just looking? Try the demo Ryder Cup ›</Text>
+        </PressableLink>
+      )}
 
       {user && (
         <View style={[s.row, { marginTop: 8 }]}>

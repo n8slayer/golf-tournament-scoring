@@ -7,9 +7,7 @@ import { PressableLink } from '../components/NavCard';
 import { JoinCodeCard } from '../components/JoinCodeCard';
 import { CourseHero } from '../components/CourseHero';
 import { s, colors, icon } from '../lib/styles';
-
-// Demo event anyone can join to look around (Ryder Cup format).
-const DEMO_CODE = 'ad4b50adff';
+import { DEMO_CODE } from '../lib/sync';
 
 // Landing: My Events once you have any; first-timers get a welcome screen.
 export default function Landing() {

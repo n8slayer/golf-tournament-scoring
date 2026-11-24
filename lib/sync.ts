@@ -68,8 +68,7 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
     ? await db.from('player_emails').select('trip_id, player_id, email').in('trip_id', ids)
     : { data: [], error: null };
   if (emails.error) throw emails.error;
-  const emailOf = (tripId: string, playerId: string) =>
-    emails.data?.find((e) => e.trip_id === tripId && e.player_id === playerId)?.email;
+  const emailOf = (tripId: string, playerId: string) => emails.data?.find((e) => e.trip_id === tripId && e.player_id === playerId)?.email;
   return (rows ?? []).map((r) =>
     migrateTrip({
       ...(r.data as Trip),
@@ -90,7 +89,7 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
           role: r.organizer_id === userId ? 'owner' : me?.role === 'admin' ? 'admin' : 'player',
         } as const;
       })(),
-    })
+    }),
   );
 }
 
@@ -98,8 +97,13 @@ export async function fetchTrips(userId: string): Promise<Trip[]> {
 // allows for the organizer and co-organizers. Returns the server's invite code / organizer id.
 export async function pushTrip(trip: Trip): Promise<{ inviteCode: string; organizerId: string }> {
   const q = trip.sync
-    ? client().from('trips').update({ data: tripData(trip) }).eq('id', trip.id)
-    : client().from('trips').insert({ id: trip.id, data: tripData(trip) });
+    ? client()
+        .from('trips')
+        .update({ data: tripData(trip) })
+        .eq('id', trip.id)
+    : client()
+        .from('trips')
+        .insert({ id: trip.id, data: tripData(trip) });
   const { data, error } = await q.select('invite_code, organizer_id').single();
   if (error) throw error;
   return { inviteCode: data.invite_code, organizerId: data.organizer_id };
@@ -209,3 +213,6 @@ export async function addSelfAsPlayer(tripId: string, playerId: string, name: st
   });
   if (error) throw error;
 }
+
+// Demo Ryder Cup event anyone can join to look around.
+export const DEMO_CODE = 'ad4b50adff';
