@@ -1,5 +1,5 @@
 import { Trip } from '../types/models';
-import { courseFor, formatOf, isTeamBall, matchPairings } from './scoring';
+import { courseFor, ballSides } from './scoring';
 
 // Party Mode: every gross birdie or better in the event (strokes <= par - 1).
 export interface PartyHole {
@@ -20,12 +20,8 @@ export function partyHoles(trip: Trip): PartyHole[] {
   for (const sc of trip.scores) {
     const round = trip.rounds.find((r) => r.id === sc.roundId);
     // Alternate shot / scramble: the side's score is on every player; celebrate it once, from its first player.
-    const side =
-      round && round.matchEnabled && isTeamBall(formatOf(round))
-        ? matchPairings(trip, round)
-            .flatMap((m) => [m.sideA, m.sideB])
-            .find((ids) => ids.includes(sc.playerId))
-        : undefined;
+    if (!trip.players.some((p) => p.id === sc.playerId)) continue; // e.g. a Wolf pick, not a score
+    const side = round ? ballSides(trip, round).find((ids) => ids.includes(sc.playerId)) : undefined;
     if (side && side[0] !== sc.playerId) continue;
     const par = round && courseFor(trip, round)?.holes.find((h) => h.number === sc.holeNumber)?.par;
     if (!round || !par || !sc.strokes || sc.strokes > par - 1) continue;
@@ -46,6 +42,7 @@ function selfCheck() {
   const holes = [4, 5, 3].map((par, i) => ({ number: i + 1, par, strokeIndex: i + 1 }));
   const trip = {
     players: [{ id: 'a', name: 'Mike', handicapIndex: 0 }],
+    teams: [],
     courses: [{ id: 'c', name: 'C', holes }],
     rounds: [{ id: 'r', name: 'Day 1', courseId: 'c' }],
     scores: [
@@ -54,6 +51,7 @@ function selfCheck() {
       { roundId: 'r', playerId: 'a', holeNumber: 3, strokes: 1 }, // ace
       { roundId: 'r', playerId: 'a', holeNumber: 4, strokes: 2 }, // no such hole
       { roundId: 'x', playerId: 'a', holeNumber: 1, strokes: 2 }, // no such round
+      { roundId: 'r', playerId: '_wolf', holeNumber: 1, strokes: 1 }, // a Wolf pick, not a score
     ],
   } as unknown as Trip;
   const got = partyHoles(trip)

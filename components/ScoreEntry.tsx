@@ -4,7 +4,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTrips } from '../context/TripsContext';
 import { holeNumbersFor } from '../lib/holeRanges';
 import { strokesReceivedOnHole, courseHandicap, formatHandicap } from '../lib/handicap';
-import { leaderboard, matchPairings, matchStatus, courseFor, eventOf, formatOf, isTeamBall, sideHandicap, teeGroups } from '../lib/scoring';
+import { leaderboard, matchPairings, matchStatus, courseFor, eventOf, ballSides, sideHandicap, teeGroups } from '../lib/scoring';
+import { gameOf, roundGame, fmtGame, wolfOn, wolfPick, WOLF_ID, LONE } from '../lib/games';
 import { router } from 'expo-router';
 import { s, colors, icon } from '../lib/styles';
 import { Trip, Round } from '../types/models';
@@ -75,12 +76,7 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   const players = trip.players.filter((p) => group.includes(p.id)).sort((a, b) => (a.id === mine ? -1 : b.id === mine ? 1 : 0));
   // Who gets a score row: each player, or each side in alternate shot / scramble (one ball per side;
   // its score is saved for every player on the side). Your own row first.
-  const sides =
-    round.matchEnabled && isTeamBall(formatOf(round))
-      ? matchPairings(trip, round)
-          .flatMap((m) => [m.sideA, m.sideB])
-          .filter((ids) => ids.some((id) => group.includes(id)))
-      : [];
+  const sides = ballSides(trip, round).filter((ids) => ids.some((id) => group.includes(id)));
   const onASide = new Set(sides.flat());
   const entries = [
     ...sides.map((ids) => ({
@@ -100,8 +96,15 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
   const holeDone = (n: number) => players.length > 0 && players.every((p) => strokesFor(p.id, n) !== undefined);
   const reachable = firstOpenHole(trip, round, holes, group); // can't skip past an unfinished hole
   const isLast = index === holes.length - 1;
-  const canAdvance = !isLast && holeDone(holeNumber);
-  const roundDone = holes.every(holeDone);
+  // Wolf: the wolf rotates each hole and must pick a partner (or go alone) before moving on.
+  const game = gameOf(trip);
+  const wolf = game?.type === 'wolf' ? wolfOn(round, index) : undefined;
+  const pick = wolf ? wolfPick(trip, round, holeNumber) : undefined;
+  const choose = (choice: string | 'lone') =>
+    recordScore(tripId, roundId, WOLF_ID, holeNumber, choice === 'lone' ? LONE : round.playerIds.indexOf(choice) + 1);
+  const picked = (n: number, i: number) => game?.type !== 'wolf' || !!wolfPick(trip, round, n) || !wolfOn(round, i);
+  const canAdvance = !isLast && holeDone(holeNumber) && picked(holeNumber, index);
+  const roundDone = holes.every((n, i) => holeDone(n) && picked(n, i));
 
   // Scores on this hole are final: Party Mode alerts fire now (not mid-entry).
   const nextHole = () => {
@@ -133,7 +136,9 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
         })
     : [];
   // Individual net standings mean nothing when each side plays one ball: show only the match status then.
-  const standings = sides.length ? [] : leaderboard(trip, round).filter((r) => r.thru > 0 && group.includes(r.playerId));
+  const standings = sides.length || game ? [] : leaderboard(trip, round).filter((r) => r.thru > 0 && group.includes(r.playerId));
+  // Extra games: this round's game result (teams, or the group's players).
+  const gameRows = game ? roundGame(trip, round).filter((r) => r.value !== null && (game.teams || group.includes(r.id))) : [];
 
   const base = `/trip/${tripId}/rounds/${roundId}`;
 
@@ -159,8 +164,19 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
                 </View>
               ))}
             </View>
+          ) : gameRows.length ? (
+            <View style={hb.standings}>
+              {gameRows.map((r, i) => (
+                <View key={r.id} style={[hb.standing, i === 0 && hb.standingLead]}>
+                  <Text style={[hb.standingText, i === 0 && { color: colors.primary }]} numberOfLines={1}>
+                    {r.name} {fmtGame(r.value, game!.unit)}
+                    {game!.unit === 'pts' ? ' pts' : ''}
+                  </Text>
+                </View>
+              ))}
+            </View>
           ) : (
-            !sides.length && <Text style={hb.statusText}>No scores yet. Net standings appear after the first hole.</Text>
+            !sides.length && <Text style={hb.statusText}>No scores yet. Standings appear after the first hole.</Text>
           )}
         </View>
 
@@ -247,6 +263,25 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
               ))}
             </View>
             <Text style={[s.subtitle, { fontSize: 13 }]}>Scoring for {players.map((p) => p.name).join(', ')}</Text>
+          </View>
+        )}
+        {wolf && (
+          <View style={[s.card, { gap: 8 }]}>
+            <Text style={s.title}>🐺 {nameOf(wolf)} is the wolf</Text>
+            <Text style={s.subtitle}>Partner or alone? Pick before moving on.</Text>
+            <View style={s.pillRow} accessibilityRole="radiogroup">
+              {[...round.playerIds.filter((id) => id !== wolf), 'lone' as const].map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => choose(c)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: pick === c }}
+                  style={({ pressed }) => [s.pill, pick === c && s.pillActive, pressed && s.pressed]}
+                >
+                  <Text style={pick === c ? s.pillTextActive : s.pillText}>{c === 'lone' ? 'Lone wolf' : `+ ${nameOf(c)}`}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         )}
         {entries.map((p) => {
@@ -358,7 +393,11 @@ export function ScoreEntry({ tripId, roundId }: { tripId: string; roundId: strin
               <Text style={s.buttonText}>Next hole</Text>
               <Ionicons name="arrow-forward" size={icon.sm} color={colors.onAccent} />
             </Pressable>
-            {!canAdvance && <Text style={[s.subtitle, { textAlign: 'center' }]}>Enter a score for everyone to move on.</Text>}
+            {!canAdvance && (
+              <Text style={[s.subtitle, { textAlign: 'center' }]}>
+                {holeDone(holeNumber) ? 'Pick the wolf’s partner to move on.' : 'Enter a score for everyone to move on.'}
+              </Text>
+            )}
           </>
         )}
         {isLast && roundDone && (

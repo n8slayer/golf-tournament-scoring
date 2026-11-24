@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTrips } from '../context/TripsContext';
 import { EventType } from '../types/models';
 import { s, colors } from '../lib/styles';
+import { GAME_RULES } from '../lib/games';
 
 type Mode = 'rydercup' | 'teams' | 'individual';
 interface Game {
@@ -22,16 +23,16 @@ const MODES: { id: Mode; name: string; desc: string; color: string }[] = [
 const GAMES: Record<Mode, Game[]> = {
   rydercup: [],
   teams: [
-    { id: 'team-stableford', name: 'Team Stableford', desc: 'Every player’s Stableford points count for the team.' },
-    { id: 'team-stroke', name: 'Team Stroke Play', desc: 'Every player’s strokes count for the team.' },
-    { id: 'best-ball', name: 'Best Ball', desc: 'Own ball each; the team’s best score counts.' },
-    { id: 'scramble', name: 'Scramble', desc: 'Everyone hits, play the best shot.' },
+    { id: 'team-stableford', name: 'Team Stableford', desc: 'Every player’s Stableford points count for the team.', type: 'team-stableford' },
+    { id: 'team-stroke', name: 'Team Stroke Play', desc: 'Every player’s net strokes count for the team.', type: 'team-stroke' },
+    { id: 'best-ball', name: 'Best Ball', desc: 'Own ball each; the team’s best net score counts.', type: 'best-ball' },
+    { id: 'scramble', name: 'Scramble', desc: 'Everyone hits, play the best shot.', type: 'team-scramble' },
   ],
   individual: [
     { id: 'strokeplay', name: 'Stroke Play', desc: 'Lowest net total across the trip.', type: 'strokeplay' },
     { id: 'stableford', name: 'Stableford', desc: 'Points per hole against par. Most points wins.', type: 'stableford' },
-    { id: 'merit', name: 'Order of Merit', desc: 'Points for where you finish each round.' },
-    { id: 'wolf', name: 'Wolf', desc: 'Rotating wolf picks a partner or goes alone.' },
+    { id: 'merit', name: 'Order of Merit', desc: 'Points for where you finish each round.', type: 'merit' },
+    { id: 'wolf', name: 'Wolf', desc: 'Rotating wolf picks a partner or goes alone. Groups of 3 or 4.', type: 'wolf' },
   ],
 };
 
@@ -58,7 +59,7 @@ export function NewEventDialog({ visible, onClose }: { visible: boolean; onClose
       courses: [],
       players: [],
       event: { type, skinValue: 5, matchStake: 20 },
-      ...(type === 'rydercup' ? { teamNames: ['Team A', 'Team B'] as [string, string] } : {}),
+      ...(type === 'rydercup' || (type in GAME_RULES && GAME_RULES[type as keyof typeof GAME_RULES].teams) ? { teamNames: ['Team A', 'Team B'] as [string, string] } : {}),
     });
     close();
     router.push(`/trip/${id}`);
@@ -143,7 +144,6 @@ export function NewEventDialog({ visible, onClose }: { visible: boolean; onClose
                     );
                   })}
                 </View>
-                {mode === 'teams' && <Text style={s.subtitle}>Team games are on the way. Use Ryder Cup or Individual for now.</Text>}
               </View>
             )}
 

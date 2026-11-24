@@ -1,14 +1,14 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PressableLink } from './NavCard';
-import { eventOf } from '../lib/scoring';
+import { isTeamEvent } from '../lib/games';
 import { s, colors, icon } from '../lib/styles';
 import { Trip } from '../types/models';
 
 // Organizer's next steps after the quick "New event" dialog. Hidden once everything is done.
 export function SetupChecklist({ trip }: { trip: Trip }) {
   const base = `/trip/${trip.id}`;
-  const ryder = eventOf(trip).type === 'rydercup';
+  const ryder = isTeamEvent(trip);
   const steps = [
     {
       done: trip.courses.length > 0,

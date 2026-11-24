@@ -68,7 +68,16 @@ export interface Score {
   strokes: number;
 }
 
-export type EventType = 'rydercup' | 'strokeplay' | 'stableford';
+export type EventType =
+  | 'rydercup'
+  | 'strokeplay'
+  | 'stableford'
+  | 'merit'
+  | 'wolf'
+  | 'team-stroke'
+  | 'team-stableford'
+  | 'best-ball'
+  | 'team-scramble';
 
 export interface EventSettings {
   type: EventType;

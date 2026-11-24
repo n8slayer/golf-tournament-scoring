@@ -8,11 +8,11 @@ import { PressableLink } from '../components/NavCard';
 import { JoinCodeCard } from '../components/JoinCodeCard';
 import { NewEventDialog } from '../components/NewEventDialog';
 import { eventOf } from '../lib/scoring';
+import { EVENT_LABEL } from '../lib/games';
 import { s, colors, icon } from '../lib/styles';
 import { DEMO_CODE } from '../lib/sync';
 import { Trip } from '../types/models';
 
-const FORMAT = { rydercup: 'RYDER CUP', strokeplay: 'STROKE PLAY', stableford: 'STABLEFORD' } as const;
 const serif = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia, "Times New Roman", serif' });
 
 const fmtDate = (iso?: string) => {
@@ -32,7 +32,7 @@ function EventCard({ trip }: { trip: Trip }) {
           {trip.name}
         </Text>
         <Text style={st.meta}>
-          {FORMAT[event.type]}
+          {EVENT_LABEL[event.type].toUpperCase()}
           {when ? `  ·  ${when}` : ''}
           {`  ·  ${trip.players.length} player${trip.players.length === 1 ? '' : 's'}`}
         </Text>

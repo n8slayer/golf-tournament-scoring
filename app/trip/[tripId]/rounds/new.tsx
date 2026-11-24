@@ -70,11 +70,12 @@ export default function NewRound() {
   const matchesOk = !matchEnabled || !hasTeams || matches.length === 0 || isComplete(matches);
   const withMatches = matchEnabled && hasTeams && matches.length > 0;
   // One ball per side: no individual scores, so no skins.
-  const teamBall = withMatches && isTeamBall(format);
+  const teamBall = (withMatches && isTeamBall(format)) || event?.type === 'team-scramble';
+  const wolfBad = event?.type === 'wolf' && (selected.length < 3 || selected.length > 4);
   // With matches, only the players in a match play this round (others would block scoring and skins).
   const inMatches = withMatches ? selected.filter((id) => matches.some((m) => [...m.sideA, ...m.sideB].includes(id))) : selected;
   const leftOut = selected.filter((id) => !inMatches.includes(id)).map((id) => trip.players.find((p) => p.id === id)?.name ?? '?');
-  const canCreate = selected.length > 0 && !!name.trim() && matchesOk;
+  const canCreate = selected.length > 0 && !!name.trim() && matchesOk && !wolfBad;
 
   const submit = () => {
     if (!canCreate || !chosenCourseId) return;
@@ -144,10 +145,12 @@ export default function NewRound() {
         ))}
       </View>
 
+      {wolfBad && <Text style={s.subtitle}>Wolf is played by one group: pick 3 or 4 players.</Text>}
+
       <View style={[s.row, { marginTop: 8 }]}>
         <Text style={s.label}>Skins</Text>
         {teamBall ? (
-          <Text style={[s.subtitle, { flex: 1, textAlign: 'right' }]}>Off: one ball per side</Text>
+          <Text style={[s.subtitle, { flex: 1, textAlign: 'right' }]}>Off: one ball per {withMatches ? 'side' : 'team'}</Text>
         ) : (
           <Switch value={skinsEnabled} onValueChange={setSkinsEnabled} />
         )}

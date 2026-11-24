@@ -7,6 +7,8 @@ import { leaderboard, computeSettlement, courseFor, skinsForRound, matchPairings
 import { holeNumbersFor } from '../../../../../lib/holeRanges';
 import { PressableLink } from '../../../../../components/NavCard';
 import { Scorecard } from '../../../../../components/Scorecard';
+import { RoundGameCard } from '../../../../../components/GameBoard';
+import { gameOf } from '../../../../../lib/games';
 import { TvTable, HoleByHole, ScoringStats, ModeToggle, Mode, BoardRow, toPar, parColor } from '../../../../../components/TvBoard';
 import { s, colors, icon } from '../../../../../lib/styles';
 
@@ -27,7 +29,7 @@ export default function Leaderboard() {
   const stableford = eventOf(trip).type === 'stableford';
   const nameOf = (id: string) => trip.players.find((p) => p.id === id)?.name ?? 'Unknown';
   const roundDone = rows.length > 0 && rows.every((r) => r.thru === holeNumbers.length);
-  const winners = roundDone
+  const winners = roundDone && !gameOf(trip)
     ? rows.filter((r) => (stableford ? r.points === rows[0].points : r.net === rows[0].net))
     : [];
   const payments = roundDone ? computeSettlement(trip, [round]) : [];
@@ -92,6 +94,7 @@ export default function Leaderboard() {
 
   const header = (
     <View style={{ gap: 12 }}>
+      <RoundGameCard trip={trip} round={round} />
       {winners.length > 0 && (
         <View style={st.banner} accessibilityRole="header" accessibilityLiveRegion="polite">
           <Ionicons name="trophy" size={32} color={colors.sand} />

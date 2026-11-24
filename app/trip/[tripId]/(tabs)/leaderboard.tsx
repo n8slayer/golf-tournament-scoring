@@ -3,6 +3,8 @@ import { useGlobalSearchParams } from 'expo-router';
 import { useTrips } from '../../../../context/TripsContext';
 import { MatchBoard, TeamScoreHeader } from '../../../../components/MatchBoard';
 import { StandingsBoard } from '../../../../components/StandingsBoard';
+import { GameBoard } from '../../../../components/GameBoard';
+import { gameOf } from '../../../../lib/games';
 import { NavCard } from '../../../../components/NavCard';
 import { eventOf, matchPairings } from '../../../../lib/scoring';
 import { s } from '../../../../lib/styles';
@@ -18,7 +20,7 @@ export default function LeaderboardTab() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
-      {ryder ? hasMatches ? <MatchBoard trip={trip} /> : <TeamScoreHeader trip={trip} /> : <StandingsBoard trip={trip} />}
+      {ryder ? hasMatches ? <MatchBoard trip={trip} /> : <TeamScoreHeader trip={trip} /> : gameOf(trip) ? <GameBoard trip={trip} /> : <StandingsBoard trip={trip} />}
       {trip.rounds.length > 0 && (
         <View style={{ gap: 8, marginTop: 8 }}>
           <Text style={s.label}>Round leaderboards</Text>

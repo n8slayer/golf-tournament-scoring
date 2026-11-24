@@ -7,6 +7,7 @@ import { NavCard } from '../../../../components/NavCard';
 import { ShareCard } from '../../../../components/ShareCard';
 import { PartyModeSwitch } from '../../../../components/PartyAlert';
 import { eventOf } from '../../../../lib/scoring';
+import { isTeamEvent } from '../../../../lib/games';
 import { s, colors, icon } from '../../../../lib/styles';
 
 // Everything that isn't Home / Score / Leaderboard: invite, setup, switching events, account.
@@ -64,7 +65,7 @@ export default function MoreTab() {
         title={trip.courses.length === 1 ? 'Course & scorecard' : 'Courses & scorecards'}
         subtitle={trip.courses.map((c) => c.name).join(', ')}
       />
-      {eventOf(trip).type === 'rydercup' && (
+      {isTeamEvent(trip) && (
         <NavCard
           href={`${base}/draft`}
           icon="shuffle"

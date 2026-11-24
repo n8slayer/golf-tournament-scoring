@@ -60,6 +60,20 @@ export function sideHandicap(trip: Trip, round: Round, ids: string[]): number {
   return Math.round(chs.reduce((sum, ch, i) => sum + ch * (weights[i] ?? 0), 0));
 }
 
+// Team scramble event: each team in the round plays one ball.
+export function scrambleTeams(trip: Trip, round: Round): string[][] {
+  if (eventOf(trip).type !== 'team-scramble') return [];
+  return trip.teams
+    .map((t) => round.playerIds.filter((id) => getPlayer(trip, id)?.teamId === t.id))
+    .filter((ids) => ids.length > 0);
+}
+
+// Players who share one ball and one score: alternate shot / scramble match sides, or scramble teams.
+export function ballSides(trip: Trip, round: Round): string[][] {
+  const sides = round.matchEnabled && isTeamBall(formatOf(round)) ? matchPairings(trip, round).flatMap((m) => [m.sideA, m.sideB]) : [];
+  return [...sides, ...scrambleTeams(trip, round).flatMap((ids) => Array.from({ length: Math.ceil(ids.length / 4) }, (_, i) => ids.slice(i * 4, i * 4 + 4)))];
+}
+
 // Older trips have no event settings: teams mean Ryder Cup, otherwise stroke play.
 export function eventOf(trip: Trip): EventSettings {
   return trip.event ?? { type: trip.teams.length === 2 ? 'rydercup' : 'strokeplay', skinValue: 5, matchStake: 20 };
@@ -145,6 +159,8 @@ export function matchPairings(trip: Trip, round: Round): MatchPairing[] {
 // round players not in a match follow, 4 to a group.
 export function teeGroups(trip: Trip, round: Round): string[][] {
   const groups: string[][] = [];
+  // Team scramble: each team plays together (one ball), 4 to a group.
+  for (const ids of scrambleTeams(trip, round)) for (let i = 0; i < ids.length; i += 4) groups.push(ids.slice(i, i + 4));
   for (const m of round.matchEnabled ? matchPairings(trip, round) : []) {
     const ids = [...m.sideA, ...m.sideB];
     const last = groups[groups.length - 1];

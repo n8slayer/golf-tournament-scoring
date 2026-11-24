@@ -22,11 +22,11 @@ import {
   matchPairings,
 } from '../../../../lib/scoring';
 import { holeNumbersFor } from '../../../../lib/holeRanges';
+import { EVENT_LABEL, gameOf, gameStandings, fmtGame } from '../../../../lib/games';
 import { formatHandicap } from '../../../../lib/handicap';
 import { s, colors, icon } from '../../../../lib/styles';
 import { Trip, Round } from '../../../../types/models';
 
-const FORMAT_NAME = { rydercup: 'Ryder Cup', strokeplay: 'Stroke play', stableford: 'Stableford' } as const;
 const toPar = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : `−${-n}`);
 
 function roundState(trip: Trip, round: Round): 'done' | 'live' | 'upcoming' {
@@ -246,7 +246,9 @@ export default function EventHome() {
   if (!trip) return null;
   const editor = canEdit(trip);
   const event = eventOf(trip);
-  const leader = event.type !== 'rydercup' ? tripStandings(trip).find((r) => r.holes > 0) : undefined;
+  const game = gameOf(trip);
+  const gameLeader = game ? gameStandings(trip).find((r) => r.value !== null) : undefined;
+  const leader = event.type !== 'rydercup' && !game ? tripStandings(trip).find((r) => r.holes > 0) : undefined;
   const needsPlayer = !editor && trip.sync && !trip.sync.myPlayerId;
   const dates = [event.startDate, event.endDate].filter(Boolean).join(' – ');
   // Photo of the course being played now (or next), else the first course.
@@ -257,7 +259,7 @@ export default function EventHome() {
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
       <CourseHero courseName={heroCourse?.name} height={180}>
         <Text style={st.kicker}>
-          {FORMAT_NAME[event.type].toUpperCase()}
+          {EVENT_LABEL[event.type].toUpperCase()}
           {dates ? ` · ${dates}` : ''}
         </Text>
         <Text style={[s.h1, st.onPhoto, { fontSize: 30 }]} accessibilityRole="header">
@@ -289,6 +291,13 @@ export default function EventHome() {
 
       {event.type === 'rydercup' ? (
         <TeamScoreHeader trip={trip} />
+      ) : game ? (
+        <View style={st.leader}>
+          <Text style={st.kicker}>{game.higherWins ? 'MOST POINTS' : 'LOWEST TO PAR'}</Text>
+          <Text style={[s.title, { fontSize: 22 }]}>
+            {gameLeader ? `${gameLeader.name} leads · ${fmtGame(gameLeader.value, game.unit)}${game.unit === 'pts' ? ' pts' : ''}` : 'No scores yet'}
+          </Text>
+        </View>
       ) : (
         <View style={st.leader}>
           <Text style={st.kicker}>{event.type === 'stableford' ? 'MOST POINTS' : 'LOWEST NET'}</Text>
